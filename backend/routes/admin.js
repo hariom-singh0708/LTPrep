@@ -9,25 +9,33 @@ import {
   deleteSubject,
   deleteChapter,
   deleteQuestion,
-  getAdminDashboard ,
+  getAdminDashboard,
+  getAllUsers,
+  deleteUser,
+  assignCourse,
+  removeCourse,
 } from "../controllers/adminController.js";
+
 import { auth, adminOnly } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.get("/dashboard", auth, adminOnly, getAdminDashboard);
+router.use(auth, adminOnly);
 
-// Create
+router.get("/dashboard", getAdminDashboard);
+router.get("/users", getAllUsers);
+router.delete("/users/:id", deleteUser);
+router.post("/assign-course", assignCourse);
+router.post("/remove-course", removeCourse);
+
 router.post("/subjects", addSubject);
 router.post("/chapters", addChapter);
 router.post("/questions", addQuestion);
 
-// Update
 router.put("/subjects/:id", updateSubject);
 router.put("/chapters/:id", updateChapter);
 router.put("/questions/:id", updateQuestion);
 
-// Delete
 router.delete("/subjects/:id", deleteSubject);
 router.delete("/chapters/:id", deleteChapter);
 router.delete("/questions/:id", deleteQuestion);

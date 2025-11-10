@@ -8,7 +8,7 @@ import Checkout from "./pages/Checkout.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import { ProtectedRoute, AdminRoute } from "./components/ProtectedRoute.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
-
+import AdminDashboard from "./pages/AdminDashboard";
 
 export default function App() {
   return (
@@ -57,6 +57,16 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute>
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              </ProtectedRoute>
+          }
+        />
           <Route path="/payment/success" element={<PaymentSuccess />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

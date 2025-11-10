@@ -1,4 +1,3 @@
-// controllers/paymentController.js
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -17,47 +16,23 @@ const {
   PHONEPE_CALLBACK_URL,
 } = process.env;
 
-if (
-  !PHONEPE_MERCHANT_ID ||
-  !PHONEPE_SALT_KEY ||
-  PHONEPE_SALT_INDEX == null ||
-  !PHONEPE_BASE_URL ||
-  !PHONEPE_REDIRECT_URL ||
-  !PHONEPE_CALLBACK_URL
-)
-  throw new Error("❌ Missing PhonePe environment configuration");
-
-// =============================
-// 🔧 Utility Helpers
-// =============================
+// ---------- Helpers ----------
 const generateTxnId = (prefix = "SUB") =>
-  `${prefix}-${Date.now().toString(36)}${Math.floor(Math.random() * 10000)}`.slice(
-    0,
-    38
-  );
+  `${prefix}-${Date.now().toString(36)}${Math.floor(Math.random() * 10000)}`.slice(0, 38);
 
 const checksumForPay = (payload, endpoint) => {
   const base64Payload = Buffer.from(JSON.stringify(payload)).toString("base64");
-  const hash = crypto
-    .createHash("sha256")
-    .update(base64Payload + endpoint + PHONEPE_SALT_KEY)
-    .digest("hex");
+  const hash = crypto.createHash("sha256").update(base64Payload + endpoint + PHONEPE_SALT_KEY).digest("hex");
   return { base64Payload, checksum: `${hash}###${PHONEPE_SALT_INDEX}` };
 };
 
 const checksumForStatus = (endpoint) => {
-  const hash = crypto
-    .createHash("sha256")
-    .update(endpoint + PHONEPE_SALT_KEY)
-    .digest("hex");
+  const hash = crypto.createHash("sha256").update(endpoint + PHONEPE_SALT_KEY).digest("hex");
   return `${hash}###${PHONEPE_SALT_INDEX}`;
 };
 
 const verifyCallbackChecksum = (responseBase64, received) => {
-  const calc = crypto
-    .createHash("sha256")
-    .update(responseBase64 + PHONEPE_SALT_KEY)
-    .digest("hex");
+  const calc = crypto.createHash("sha256").update(responseBase64 + PHONEPE_SALT_KEY).digest("hex");
   return `${calc}###${PHONEPE_SALT_INDEX}` === received;
 };
 
@@ -67,36 +42,28 @@ const parsePaymentStatus = (r) => {
   const resCode = r?.data?.responseCode;
   const success = code === "PAYMENT_SUCCESS" || (state === "COMPLETED" && resCode === "SUCCESS");
   const pending = code === "PAYMENT_PENDING" || state === "PENDING";
-  return {
-    isSuccess: success,
-    isPending: pending,
-    isFailed: !success && !pending,
-  };
+  return { isSuccess: success, isPending: pending };
 };
 
+// Assign subject to user after success
 const recordPurchaseIfNeeded = async (txn) => {
-  const user = await User.findById(txn.userId).lean();
+  const user = await User.findById(txn.userId);
   if (!user) return;
 
-  const exists = user.purchases?.some(
-    (p) =>
-      String(p.subjectId) === String(txn.subjectId) &&
-      String(p.transactionId) === String(txn._id)
+  const alreadyPurchased = user.purchasedSubjects?.some(
+    (id) => String(id) === String(txn.subjectId)
   );
+  if (alreadyPurchased) return;
 
-  if (!exists) {
-    await User.findByIdAndUpdate(txn.userId, {
-      $addToSet: { purchasedSubjects: txn.subjectId },
-      $push: {
-        purchases: {
-          subjectId: txn.subjectId,
-          transactionId: txn._id,
-          amount: txn.amount,
-          purchasedAt: new Date(),
-        },
-      },
-    });
-  }
+  user.purchasedSubjects.push(txn.subjectId);
+  user.purchases.push({
+    subjectId: txn.subjectId,
+    transactionId: txn._id,
+    amount: txn.amount,
+    purchasedAt: new Date(),
+  });
+
+  await user.save();
 };
 
 const verifyAndFinalize = async (txnId) => {
@@ -113,10 +80,7 @@ const verifyAndFinalize = async (txnId) => {
   });
 
   const data = await res.json();
-  const txn =
-    (await Transaction.findOne({ merchantTransactionId: txnId })) ||
-    (await Transaction.findById(txnId));
-
+  const txn = await Transaction.findOne({ merchantTransactionId: txnId });
   if (!txn) return { ok: false, status: "NOT_FOUND", response: data };
 
   const { isSuccess, isPending } = parsePaymentStatus(data);
@@ -131,33 +95,27 @@ const verifyAndFinalize = async (txnId) => {
   return { ok: true, status, response: data };
 };
 
-// =============================
-// Payment Handlers
-// =============================
+// ---------- Controllers ----------
+
+// Step 1: Create PhonePe payment
 export const initiatePayment = async (req, res) => {
   try {
     const { subjectId } = req.body;
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const subject = await Subject.findById(subjectId).lean();
+    const subject = await Subject.findById(subjectId);
     if (!subject) return res.status(404).json({ message: "Subject not found" });
 
-    const user = await User.findById(userId).lean();
+    const user = await User.findById(userId);
     if (user.purchasedSubjects?.includes(subjectId))
       return res.status(400).json({ message: "Already purchased" });
 
     const amount = Number(subject.price);
-    if (!amount || amount <= 0)
-      return res.status(400).json({ message: "Invalid price" });
+    if (!amount || amount <= 0) return res.status(400).json({ message: "Invalid price" });
 
     const merchantTransactionId = generateTxnId("SUB");
-    const transaction = await Transaction.create({
-      userId,
-      subjectId,
-      merchantTransactionId,
-      amount,
-    });
+    await Transaction.create({ userId, subjectId, merchantTransactionId, amount, status: "PENDING" });
 
     const payload = {
       merchantId: PHONEPE_MERCHANT_ID,
@@ -185,20 +143,17 @@ export const initiatePayment = async (req, res) => {
     if (!data?.success)
       return res.status(400).json({ message: "Payment initiation failed", data });
 
-    await Transaction.findByIdAndUpdate(transaction._id, { paymentResponse: data });
-
     res.json({
       redirectUrl: data.data.instrumentResponse.redirectInfo.url,
       transactionId: merchantTransactionId,
-      subjectId,
-      amount,
     });
   } catch (err) {
-    console.error("❌ Initiate error:", err);
+    console.error("❌ initiatePayment error:", err);
     res.status(500).json({ message: "Payment initiation failed" });
   }
 };
 
+// Step 2: PhonePe callback (server-to-server)
 export const phonePeCallback = async (req, res) => {
   try {
     const { response } = req.body;
@@ -217,27 +172,27 @@ export const phonePeCallback = async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("❌ Callback error:", err);
+    console.error("❌ phonePeCallback error:", err);
     res.status(500).json({ message: "Callback failed" });
   }
 };
 
+// Step 3: Client hits verify after redirect
 export const verifyPayment = async (req, res) => {
   try {
     const { transactionId } = req.body;
-    if (!transactionId)
-      return res.status(400).json({ message: "Transaction ID required" });
+    if (!transactionId) return res.status(400).json({ message: "Transaction ID required" });
 
     const result = await verifyAndFinalize(transactionId);
     if (!result.ok) return res.status(404).json({ message: "Transaction not found" });
 
     res.json({
       success: true,
-      message: `Payment ${result.status}`,
+      status: result.status,
       data: result.response,
     });
   } catch (err) {
-    console.error("❌ Verify error:", err);
+    console.error("❌ verifyPayment error:", err);
     res.status(500).json({ message: "Verification failed" });
   }
 };

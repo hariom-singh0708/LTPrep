@@ -10,6 +10,7 @@ import {
   FaHome,
   FaBars,
   FaTimes,
+  FaChartBar,
 } from "react-icons/fa";
 
 export default function Navbar() {
@@ -56,12 +57,22 @@ export default function Navbar() {
                   Home
                 </Link>
               </li>
-              <li className="nav-item mx-1">
-                <Link className="nav-link d-flex align-items-center gap-1" to="/subjects">
+              {user.role === "student" && (
+                <li className="nav-item mx-1">
+                  <Link className="nav-link d-flex align-items-center gap-1" to="/subjects">
                   <FaBookOpen className="text-primary" />
                   Subjects
                 </Link>
-              </li>
+                </li>
+              )}
+              {user.role === "admin" && (
+                <li className="nav-item mx-1">
+                  <Link className="nav-link d-flex align-items-center gap-1" to="/admin/dashboard">
+                    <FaChartBar className="text-primary" />
+                    Dashboard
+                  </Link>
+                </li>
+              )}
               {user.role === "admin" && (
                 <li className="nav-item mx-1">
                   <Link className="nav-link d-flex align-items-center gap-1" to="/admin">

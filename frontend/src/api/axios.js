@@ -1,7 +1,10 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://ltprep.onrender.com/api", // ✅ adjust as needed
+  baseURL:
+    import.meta.env.MODE === "development"
+      ? "http://localhost:5000/api" // ✅ Local server
+      : "https://ltprep.onrender.com/api", // ✅ Deployed server
 });
 
 api.interceptors.request.use((config) => {

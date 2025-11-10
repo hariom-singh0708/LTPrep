@@ -107,8 +107,6 @@ export const updateQuestion = async (req, res) => {
 
 
 
-
-
 export const deleteSubject = async (req, res) => {
   try {
     const { id } = req.params;
@@ -168,41 +166,158 @@ export const deleteQuestion = async (req, res) => {
 };
 
 
+
+// ================== ADMIN DASHBOARD ENHANCED ==================
+
 export const getAdminDashboard = async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
+    const admin = await User.findById(req.user._id).select("-password");
+
+    const totalUsers = await User.countDocuments({ role: "student" });
     const totalSubjects = await Subject.countDocuments();
+    const totalTransactions = await Transaction.countDocuments({ status: "SUCCESS" });
 
-    // Sum of all successful transactions
-    const transactions = await Transaction.find({});
-    const totalRevenue = transactions.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const revenueAgg = await Transaction.aggregate([
+      { $match: { status: "SUCCESS" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+    const totalRevenue = revenueAgg[0]?.total || 0;
 
-    // Recent purchases from users
-    const users = await User.find({ "purchases.0": { $exists: true } })
-      .populate("purchases.subjectId", "name")
-      .sort({ "purchases.purchasedAt": -1 })
+    const recentTransactions = await Transaction.find()
+      .populate("userId", "name email")
+      .populate("subjectId", "name price")
+      .sort({ createdAt: -1 })
       .limit(10);
 
-    const recentPurchases = [];
-    users.forEach((user) => {
-      user.purchases.slice(-3).forEach((p) => {
-        recentPurchases.push({
-          userName: user.name,
-          subjectName: p.subjectId?.name || "Unknown",
-          amount: p.amount,
-          purchasedAt: p.purchasedAt,
-        });
-      });
+    res.json({
+      admin,
+      stats: {
+        totalUsers,
+        totalSubjects,
+        totalTransactions,
+        totalRevenue,
+      },
+      recentTransactions,
+    });
+  } catch (err) {
+    console.error("Dashboard error:", err);
+    res.status(500).json({ message: "Failed to fetch dashboard data" });
+  }
+};
+
+// ================== USER MANAGEMENT ==================
+
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({ role: "student" })
+      .select("-password")
+      .populate("purchasedSubjects", "name price");
+    res.json(users);
+  } catch (err) {
+    console.error("Get users error:", err);
+    res.status(500).json({ message: "Failed to get users" });
+  }
+};
+
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    await user.deleteOne();
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    console.error("Delete user error:", err);
+    res.status(500).json({ message: "Failed to delete user" });
+  }
+};
+
+// ================== COURSE ASSIGNMENT ==================
+
+export const assignCourse = async (req, res) => {
+  try {
+    const { userId, subjectId } = req.body;
+
+    if (!userId || !subjectId) {
+      return res.status(400).json({ message: "User ID & Subject ID required" });
+    }
+
+    const user = await User.findById(userId);
+    const subject = await Subject.findById(subjectId);
+
+    if (!user || !subject) {
+      return res.status(404).json({ message: "User or Subject not found" });
+    }
+
+    // Check if user already has this course
+    const alreadyAssigned = user.purchasedSubjects.some(
+      (id) => String(id) === String(subjectId)
+    );
+    if (alreadyAssigned) {
+      return res.status(400).json({ message: "Course already assigned" });
+    }
+
+    // ✅ Create an admin-granted transaction with amount = 0
+    const adminTransaction = await Transaction.create({
+      userId,
+      subjectId,
+      merchantTransactionId: `ADMIN-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+      amount: 0,
+      status: "SUCCESS",
+      paymentResponse: {
+        mode: "ADMIN_ASSIGN",
+        approvedBy: req.user?.name || "Admin",
+        note: "Course access granted manually by admin",
+      },
     });
 
-    res.json({
-      totalUsers,
-      totalSubjects,
-      totalRevenue,
-      recentPurchases: recentPurchases.slice(-10).reverse(),
+    // ✅ Update user record with new course + transaction
+    user.purchasedSubjects.push(subjectId);
+    user.purchases.push({
+      subjectId,
+      transactionId: adminTransaction._id,
+      amount: 0,
+      purchasedAt: new Date(),
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Course assigned successfully by admin",
+      transactionId: adminTransaction._id,
+    });
+  } catch (err) {
+    console.error("Assign course error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign course",
+      error: err.message,
+    });
+  }
+};
+
+export const removeCourse = async (req, res) => {
+  try {
+    const { userId, subjectId } = req.body;
+    if (!userId || !subjectId)
+      return res.status(400).json({ message: "User ID & Subject ID required" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.purchasedSubjects = user.purchasedSubjects.filter(
+      (id) => String(id) !== String(subjectId)
+    );
+    user.purchases = user.purchases.filter(
+      (p) => String(p.subjectId) !== String(subjectId)
+    );
+    await user.save();
+
+    res.json({ message: "Course removed successfully" });
+  } catch (err) {
+    console.error("Remove course error:", err);
+    res.status(500).json({ message: "Failed to remove course" });
   }
 };

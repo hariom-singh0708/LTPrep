@@ -34,17 +34,20 @@ export default function Checkout() {
   }, [subjectId]);
 
   const handlePay = async () => {
-    if (!subject) return;
-    setPaying(true);
-    try {
-      const { data } = await api.post("/payment/initiate", { subjectId });
-      window.location.href = data.redirectUrl; // redirect to PhonePe checkout
-    } catch (e) {
-      alert(e?.response?.data?.message || "Payment failed");
-    } finally {
-      setPaying(false);
-    }
-  };
+  if (!subject) return;
+  setPaying(true);
+  try {
+    const { data } = await api.post("/payment/initiate", { subjectId });
+    if (data?.redirectUrl) window.location.href = data.redirectUrl;
+    else alert("Unable to start payment, please try again.");
+  } catch (e) {
+    console.error(e);
+    alert(e?.response?.data?.message || "Payment failed");
+  } finally {
+    setPaying(false);
+  }
+};
+
 
   if (loading)
     return (

@@ -19,36 +19,32 @@ export default function PaymentSuccess() {
   const transactionId = searchParams.get("transactionId");
 
   useEffect(() => {
-    if (!transactionId) {
-      setStatus("FAILED");
-      setMessage("Invalid payment link or missing transaction ID.");
-      return;
-    }
+  if (!transactionId) {
+    setStatus("FAILED");
+    setMessage("Missing transaction ID.");
+    return;
+  }
 
-    (async () => {
-      try {
-        const { data } = await api.post("/payment/verify", { transactionId });
-        console.log("Verification Result:", data);
+  (async () => {
+    try {
+      const { data } = await api.post("/payment/verify", { transactionId });
+      console.log("Verification:", data);
 
-        if (data?.success && data?.data?.code === "PAYMENT_SUCCESS") {
-          setStatus("SUCCESS");
-          setMessage("Payment successful! 🎉 Your purchase has been activated.");
-
-          // ✅ refresh user before redirect
-          await refreshUser();
-
-          console.log("✅ User refreshed, navigating...");
-        } else {
-          setStatus("FAILED");
-          setMessage("Payment failed or still pending. Please try again.");
-        }
-      } catch (err) {
-        console.error(err);
+      if (data?.status === "SUCCESS") {
+        setStatus("SUCCESS");
+        setMessage("Payment successful! 🎉 Your course has been unlocked.");
+        await refreshUser();
+      } else {
         setStatus("FAILED");
-        setMessage("Verification failed. Please contact support.");
+        setMessage("Payment failed or still pending.");
       }
-    })();
-  }, [transactionId, refreshUser, navigate]);
+    } catch (err) {
+      console.error(err);
+      setStatus("FAILED");
+      setMessage("Verification failed. Please contact support.");
+    }
+  })();
+}, [transactionId]);
 
   return (
     <div className="container py-5 text-center">
