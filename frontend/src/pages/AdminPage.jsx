@@ -54,6 +54,7 @@ export default function AdminPage() {
 function AddSubject() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState(0);
+  const [overview, setOverview] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -65,10 +66,12 @@ function AddSubject() {
       const { data } = await api.post("/admin/subjects", {
         name,
         price: Number(price),
+        overview, // ✅ send overview
       });
       setMsg(`✅ Subject "${data.name}" added`);
       setName("");
       setPrice(0);
+      setOverview("");
       window.dispatchEvent(new CustomEvent("admin:refreshData"));
     } catch (e) {
       setMsg(`❌ ${e?.response?.data?.message || "Failed to add subject"}`);
@@ -84,7 +87,11 @@ function AddSubject() {
           <FaBook /> Add Subject
         </h5>
         {msg && (
-          <div className={`alert ${msg.startsWith("✅") ? "alert-success" : "alert-danger"} py-2`}>
+          <div
+            className={`alert ${
+              msg.startsWith("✅") ? "alert-success" : "alert-danger"
+            } py-2`}
+          >
             {msg}
           </div>
         )}
@@ -98,7 +105,7 @@ function AddSubject() {
               required
             />
           </div>
-          <div className="mb-3">
+          <div className="mb-2">
             <label className="form-label">Price (₹)</label>
             <input
               type="number"
@@ -109,6 +116,19 @@ function AddSubject() {
               required
             />
           </div>
+
+          {/* ✅ New Overview Field */}
+          <div className="mb-3">
+            <label className="form-label">Overview / Syllabus</label>
+            <textarea
+              className="form-control"
+              rows={3}
+              placeholder="Write a short description or syllabus for this subject"
+              value={overview}
+              onChange={(e) => setOverview(e.target.value)}
+            />
+          </div>
+
           <button className="btn btn-primary w-100" disabled={loading}>
             {loading ? "Adding..." : "Add Subject"}
           </button>
@@ -117,6 +137,7 @@ function AddSubject() {
     </div>
   );
 }
+
 
 /* =========================
    ADD CHAPTER
@@ -701,8 +722,11 @@ function EditModal({ type, entity, onClose, onSave }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const title =
-    type === "subject" ? "Edit Subject" :
-    type === "chapter" ? "Edit Chapter" : "Edit Question";
+    type === "subject"
+      ? "Edit Subject"
+      : type === "chapter"
+      ? "Edit Chapter"
+      : "Edit Question";
 
   const onSubmit = (e) => {
     e.preventDefault();
@@ -710,32 +734,71 @@ function EditModal({ type, entity, onClose, onSave }) {
   };
 
   return (
-    <div className="modal d-block" tabIndex="-1" style={{ background: "rgba(0,0,0,.35)" }}>
+    <div
+      className="modal d-block"
+      tabIndex="-1"
+      style={{ background: "rgba(0,0,0,.35)" }}
+    >
       <div className="modal-dialog modal-lg modal-dialog-centered">
         <div className="modal-content">
           <form onSubmit={onSubmit}>
             <div className="modal-header">
               <h5 className="modal-title">{title}</h5>
-              <button type="button" className="btn-close" onClick={onClose}></button>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={onClose}
+              ></button>
             </div>
+
             <div className="modal-body">
               {type === "subject" && (
-                <div className="row g-3">
-                  <div className="col-md-8">
-                    <label className="form-label">Name</label>
-                    <input className="form-control" value={form.name || ""} onChange={(e) => set("name", e.target.value)} required />
+                <>
+                  <div className="row g-3">
+                    <div className="col-md-8">
+                      <label className="form-label">Name</label>
+                      <input
+                        className="form-control"
+                        value={form.name || ""}
+                        onChange={(e) => set("name", e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label">Price (₹)</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={form.price ?? 0}
+                        onChange={(e) => set("price", Number(e.target.value))}
+                        required
+                      />
+                    </div>
                   </div>
-                  <div className="col-md-4">
-                    <label className="form-label">Price (₹)</label>
-                    <input type="number" className="form-control" value={form.price ?? 0} onChange={(e) => set("price", Number(e.target.value))} required />
+
+                  {/* ✅ Overview Textarea */}
+                  <div className="mt-3">
+                    <label className="form-label">Overview / Syllabus</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      placeholder="Enter or edit overview for this subject"
+                      value={form.overview || ""}
+                      onChange={(e) => set("overview", e.target.value)}
+                    />
                   </div>
-                </div>
+                </>
               )}
 
               {type === "chapter" && (
                 <div className="mb-3">
                   <label className="form-label">Chapter Name</label>
-                  <input className="form-control" value={form.name || ""} onChange={(e) => set("name", e.target.value)} required />
+                  <input
+                    className="form-control"
+                    value={form.name || ""}
+                    onChange={(e) => set("name", e.target.value)}
+                    required
+                  />
                 </div>
               )}
 
@@ -743,39 +806,68 @@ function EditModal({ type, entity, onClose, onSave }) {
                 <div className="row g-3">
                   <div className="col-md-4">
                     <label className="form-label">Type</label>
-                    <select className="form-select" value={form.type || "Expected"} onChange={(e) => set("type", e.target.value)}>
+                    <select
+                      className="form-select"
+                      value={form.type || "Expected"}
+                      onChange={(e) => set("type", e.target.value)}
+                    >
                       <option value="Expected">Expected</option>
                       <option value="PYQ">PYQ</option>
                     </select>
                   </div>
                   <div className="col-12">
                     <label className="form-label">Question</label>
-                    <textarea className="form-control" value={form.question || ""} onChange={(e) => set("question", e.target.value)} required />
+                    <textarea
+                      className="form-control"
+                      value={form.question || ""}
+                      onChange={(e) => set("question", e.target.value)}
+                      required
+                    />
                   </div>
                   <div className="col-12">
                     <label className="form-label">Options</label>
-                    {(form.options || ["","","",""]).map((opt, i) => (
-                      <input key={i} className="form-control mb-2"
-                        value={opt} onChange={(e) => {
-                          const copy = [...(form.options || ["","","",""])];
+                    {(form.options || ["", "", "", ""]).map((opt, i) => (
+                      <input
+                        key={i}
+                        className="form-control mb-2"
+                        value={opt}
+                        onChange={(e) => {
+                          const copy = [...(form.options || ["", "", "", ""])];
                           copy[i] = e.target.value;
                           set("options", copy);
-                        }} />
+                        }}
+                      />
                     ))}
                   </div>
                   <div className="col-md-6">
                     <label className="form-label">Answer</label>
-                    <input className="form-control" value={form.answer || ""} onChange={(e) => set("answer", e.target.value)} required />
+                    <input
+                      className="form-control"
+                      value={form.answer || ""}
+                      onChange={(e) => set("answer", e.target.value)}
+                      required
+                    />
                   </div>
                   <div className="col-md-6">
                     <label className="form-label">Explanation</label>
-                    <textarea className="form-control" value={form.explanation || ""} onChange={(e) => set("explanation", e.target.value)} />
+                    <textarea
+                      className="form-control"
+                      value={form.explanation || ""}
+                      onChange={(e) => set("explanation", e.target.value)}
+                    />
                   </div>
                 </div>
               )}
             </div>
+
             <div className="modal-footer">
-              <button type="button" className="btn btn-outline-secondary" onClick={onClose}>Cancel</button>
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
               <button type="submit" className="btn btn-primary">
                 <FaPlus className="me-2" /> Save Changes
               </button>
