@@ -3,7 +3,8 @@ import mongoose from "mongoose";
 const subjectSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, unique: true, trim: true },
-    price: { type: Number, required: true, min: 0 }
+    price: { type: Number, required: true, min: 0 },
+    overview: { type: String, trim: true },
   },
   { timestamps: true }
 );

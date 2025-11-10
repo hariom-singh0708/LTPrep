@@ -6,11 +6,11 @@ import User from "../models/User.js";
 
 export const addSubject = async (req, res) => {
   try {
-    const { name, price } = req.body;
+    const { name, price, overview } = req.body;
     if (!name || price == null)
       return res.status(400).json({ message: "Name & price required" });
 
-    const subject = await Subject.create({ name, price });
+    const subject = await Subject.create({ name, price, overview });
     res.status(201).json(subject);
   } catch (err) {
     if (err.code === 11000)
@@ -19,6 +19,26 @@ export const addSubject = async (req, res) => {
     res.status(500).json({ message: "Failed to add subject" });
   }
 };
+
+export const updateSubject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, price, overview } = req.body;
+
+    const updated = await Subject.findByIdAndUpdate(
+      id,
+      { name, price, overview },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ message: "Subject not found" });
+    res.json(updated);
+  } catch (err) {
+    console.error("Update subject error:", err);
+    res.status(500).json({ message: "Failed to update subject" });
+  }
+};
+
 
 export const addChapter = async (req, res) => {
   try {
@@ -57,23 +77,6 @@ export const addQuestion = async (req, res) => {
   }
 };
 
-
-export const updateSubject = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, price } = req.body;
-    const updated = await Subject.findByIdAndUpdate(
-      id,
-      { name, price },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json({ message: "Subject not found" });
-    res.json(updated);
-  } catch (err) {
-    console.error("Update subject error:", err);
-    res.status(500).json({ message: "Failed to update subject" });
-  }
-};
 
 export const updateChapter = async (req, res) => {
   try {
