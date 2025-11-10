@@ -10,6 +10,7 @@ import {
   FaLightbulb,
   FaArrowRight,
   FaBars,
+  FaDownload,
 } from "react-icons/fa";
 
 export default function SubjectPage() {
@@ -30,6 +31,7 @@ export default function SubjectPage() {
     [user, subjectId]
   );
 
+  // ✅ Load chapters
   useEffect(() => {
     (async () => {
       try {
@@ -42,6 +44,7 @@ export default function SubjectPage() {
     })();
   }, [subjectId]);
 
+  // ✅ Load questions
   useEffect(() => {
     if (!selectedChapter) return;
     (async () => {
@@ -63,9 +66,30 @@ export default function SubjectPage() {
     })();
   }, [selectedChapter, type]);
 
+  // ✅ Download PDF from backend
+  const handleDownloadPDF = async () => {
+    try {
+      const response = await api.get("/pdf/questions", {
+        params: { chapterId: selectedChapter, type },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${type}_Questions.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error("Download error:", err);
+      alert("❌ Failed to download PDF");
+    }
+  };
+
   return (
     <div className="container-fluid py-4">
-      {/* Top bar for mobile */}
+      {/* ====== Mobile Header ====== */}
       <div className="d-flex justify-content-between align-items-center mb-3 d-md-none">
         <h5 className="fw-bold mb-0 text-success">
           <FaBookOpen className="me-2 text-success" />
@@ -82,7 +106,7 @@ export default function SubjectPage() {
       </div>
 
       <div className="row g-4">
-        {/* Sidebar (Desktop view) */}
+        {/* ====== Sidebar (Desktop) ====== */}
         <div className="col-md-3 d-none d-md-block">
           <Sidebar
             chapters={chapters}
@@ -94,7 +118,7 @@ export default function SubjectPage() {
           />
         </div>
 
-        {/* Sidebar (Mobile - Offcanvas) */}
+        {/* ====== Sidebar (Mobile - Offcanvas) ====== */}
         <div
           className="offcanvas offcanvas-start"
           tabIndex="-1"
@@ -127,7 +151,7 @@ export default function SubjectPage() {
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* ====== Main Content ====== */}
         <div className="col-md-9">
           <div className="card shadow-sm border-0">
             <div className="card-body">
@@ -156,6 +180,7 @@ export default function SubjectPage() {
                 </div>
               </div>
 
+              {/* ====== Loading / Locked / Empty ====== */}
               {loading && (
                 <div className="text-center py-5">
                   <div className="spinner-border text-success"></div>
@@ -178,11 +203,25 @@ export default function SubjectPage() {
                 </div>
               )}
 
+              {/* ====== Question List ====== */}
               <div className="vstack gap-3">
                 {questions.map((q, idx) => (
                   <QuestionCard key={q._id} q={q} sno={idx} />
                 ))}
               </div>
+
+              {/* ====== Download PDF Button ====== */}
+              {questions.length > 0 && (
+                <div className="text-end mt-4">
+                  <button
+                    className="btn btn-outline-danger"
+                    onClick={handleDownloadPDF}
+                  >
+                    <FaDownload className="me-2" />
+                    Download All as PDF
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -191,7 +230,9 @@ export default function SubjectPage() {
   );
 }
 
-/* Sidebar (Reusable for desktop and mobile) */
+/* =========================
+   📚 Sidebar Component
+   ========================= */
 function Sidebar({
   chapters,
   selectedChapter,
@@ -246,7 +287,9 @@ function Sidebar({
   );
 }
 
-/* Question Card */
+/* =========================
+   ❓ Question Card Component
+   ========================= */
 function QuestionCard({ q, sno }) {
   const [selected, setSelected] = useState(null);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -312,15 +355,33 @@ function QuestionCard({ q, sno }) {
           </button>
         </div>
 
+        {/* ✅ Show Answer */}
         {showAnswer && (
           <div className="alert alert-success mt-3">
             <strong>Answer:</strong> {q.answer}
           </div>
         )}
-        {showExplain && q.explanation && (
-          <div className="alert alert-info mt-3">
+
+        {/* ✅ Show Explanation + Image Together */}
+        {showExplain && (
+          <div className="alert alert-info mt-3 text-center">
             <strong>Explanation:</strong>
-            <div className="mt-1">{q.explanation}</div>
+            <div className="mt-2">{q.explanation || "No explanation"}</div>
+
+            {q.imageUrl && (
+              <div className="mt-3">
+                <img
+                  src={q.imageUrl}
+                  alt="Question illustration"
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "300px",
+                    borderRadius: "8px",
+                    objectFit: "contain",
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

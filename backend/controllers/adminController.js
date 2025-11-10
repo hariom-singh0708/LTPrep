@@ -3,6 +3,7 @@ import Chapter from "../models/Chapter.js";
 import Question from "../models/Question.js";
 import Transaction from "../models/Transaction.js";
 import User from "../models/User.js";
+import cloudinary from "../config/cloudinary.js";
 
 export const addSubject = async (req, res) => {
   try {
@@ -54,28 +55,98 @@ export const addChapter = async (req, res) => {
   }
 };
 
+// ✅ ADD QUESTION
 export const addQuestion = async (req, res) => {
   try {
-    const { chapterId, type, question, options, answer, explanation, imageUrl } =
-      req.body;
+    const { chapterId, type, question, options, answer, explanation } = req.body;
+    let imageUrl = null;
+
+    if (req.file && req.file.path) imageUrl = req.file.path;
+
     if (!chapterId || !type || !question || !options || !answer)
       return res.status(400).json({ message: "Missing required fields" });
+
+    const parsedOptions =
+      typeof options === "string" ? JSON.parse(options) : options;
 
     const q = await Question.create({
       chapterId,
       type,
       question,
-      options,
+      options: parsedOptions,
       answer,
       explanation: explanation || "",
-      imageUrl: imageUrl || null,
+      imageUrl,
     });
-    res.status(201).json(q);
+
+    res.status(201).json({ success: true, data: q });
   } catch (err) {
-    console.error("Add question error:", err);
-    res.status(500).json({ message: "Failed to add question" });
+    console.error("❌ Add question error:", err);
+    res.status(500).json({ success: false, message: "Failed to add question" });
   }
 };
+
+export const updateQuestion = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check for existing question
+    const questionDoc = await Question.findById(id);
+    if (!questionDoc) {
+      return res.status(404).json({ success: false, message: "Question not found" });
+    }
+
+    // Extract fields from body
+    const { type, question, options, answer, explanation } = req.body;
+    const updateData = {};
+
+    if (type) updateData.type = type;
+    if (question) updateData.question = question;
+    if (answer) updateData.answer = answer;
+    if (explanation !== undefined) updateData.explanation = explanation;
+
+    // ✅ Handle options safely
+    if (options) {
+      updateData.options =
+        typeof options === "string" ? JSON.parse(options) : options;
+    }
+
+    // ✅ If new image uploaded
+    if (req.file && req.file.path) {
+      // Delete old image (if exists)
+      if (questionDoc.imageUrl) {
+        try {
+          const publicId = questionDoc.imageUrl
+            .split("/")
+            .slice(-2)
+            .join("/")
+            .split(".")[0]; // LTprep/questions/xyz
+          await cloudinary.uploader.destroy(publicId);
+          console.log("🗑️ Deleted old image:", publicId);
+        } catch (err) {
+          console.warn("⚠️ Cloudinary delete failed:", err.message);
+        }
+      }
+      // Add new Cloudinary URL
+      updateData.imageUrl = req.file.path;
+    } else {
+      // ✅ Keep old image if no new one uploaded
+      updateData.imageUrl = questionDoc.imageUrl;
+    }
+
+    // ✅ Perform update
+    const updated = await Question.findByIdAndUpdate(id, updateData, { new: true });
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error("❌ Update question error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update question",
+      error: err.message,
+    });
+  }
+};
+
 
 
 export const updateChapter = async (req, res) => {
@@ -90,24 +161,6 @@ export const updateChapter = async (req, res) => {
     res.status(500).json({ message: "Failed to update chapter" });
   }
 };
-
-export const updateQuestion = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { type, question, options, answer, explanation } = req.body;
-    const updated = await Question.findByIdAndUpdate(
-      id,
-      { type, question, options, answer, explanation },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json({ message: "Question not found" });
-    res.json(updated);
-  } catch (err) {
-    console.error("Update question error:", err);
-    res.status(500).json({ message: "Failed to update question" });
-  }
-};
-
 
 
 export const deleteSubject = async (req, res) => {

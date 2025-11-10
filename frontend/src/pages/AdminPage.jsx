@@ -232,19 +232,25 @@ function AddQuestion() {
   const [options, setOptions] = useState(["", "", "", ""]);
   const [answer, setAnswer] = useState("");
   const [explanation, setExplanation] = useState("");
+  const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Load subjects
   useEffect(() => {
     (async () => {
       try {
         const { data } = await api.get("/subjects");
         setSubjects(data);
         if (data[0]) setSubjectId(data[0]._id);
-      } catch {}
+      } catch (err) {
+        console.error("Error loading subjects:", err);
+      }
     })();
   }, []);
 
+  // Load chapters by subject
   useEffect(() => {
     if (!subjectId) return;
     (async () => {
@@ -252,7 +258,9 @@ function AddQuestion() {
         const { data } = await api.get(`/subjects/${subjectId}/chapters`);
         setChapters(data);
         if (data[0]) setChapterId(data[0]._id);
-      } catch {}
+      } catch (err) {
+        console.error("Error loading chapters:", err);
+      }
     })();
   }, [subjectId]);
 
@@ -260,20 +268,43 @@ function AddQuestion() {
     setOptions((prev) => prev.map((o, idx) => (idx === i ? val : o)));
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImage(file);
+    setPreview(URL.createObjectURL(file));
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setMsg("");
     setLoading(true);
+
     try {
-      const payload = { chapterId, type, question, options, answer, explanation };
-      await api.post("/admin/questions", payload);
-      setMsg("✅ Question added");
+      // ✅ Use FormData for file upload
+      const formData = new FormData();
+      formData.append("chapterId", chapterId);
+      formData.append("type", type);
+      formData.append("question", question);
+      formData.append("options", JSON.stringify(options));
+      formData.append("answer", answer);
+      formData.append("explanation", explanation);
+      if (image) formData.append("image", image);
+
+      await api.post("/admin/questions", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setMsg("✅ Question added successfully!");
       setQuestion("");
       setOptions(["", "", "", ""]);
       setAnswer("");
       setExplanation("");
+      setImage(null);
+      setPreview(null);
       window.dispatchEvent(new CustomEvent("admin:refreshData"));
     } catch (e) {
+      console.error("Add question error:", e);
       setMsg(`❌ ${e?.response?.data?.message || "Failed to add question"}`);
     } finally {
       setLoading(false);
@@ -286,13 +317,20 @@ function AddQuestion() {
         <h5 className="card-title text-warning d-flex align-items-center gap-2">
           <FaQuestionCircle /> Add Question
         </h5>
+
         {msg && (
-          <div className={`alert ${msg.startsWith("✅") ? "alert-success" : "alert-danger"} py-2`}>
+          <div
+            className={`alert ${
+              msg.startsWith("✅") ? "alert-success" : "alert-danger"
+            } py-2`}
+          >
             {msg}
           </div>
         )}
+
         <form onSubmit={onSubmit}>
           <div className="row g-3">
+            {/* Subject */}
             <div className="col-md-4">
               <label className="form-label">Subject</label>
               <select
@@ -307,6 +345,8 @@ function AddQuestion() {
                 ))}
               </select>
             </div>
+
+            {/* Chapter */}
             <div className="col-md-4">
               <label className="form-label">Chapter</label>
               <select
@@ -321,6 +361,8 @@ function AddQuestion() {
                 ))}
               </select>
             </div>
+
+            {/* Type */}
             <div className="col-md-4">
               <label className="form-label">Type</label>
               <select
@@ -333,6 +375,7 @@ function AddQuestion() {
               </select>
             </div>
 
+            {/* Question */}
             <div className="col-12">
               <label className="form-label">Question</label>
               <textarea
@@ -343,6 +386,7 @@ function AddQuestion() {
               />
             </div>
 
+            {/* Options */}
             <div className="col-12">
               <label className="form-label">Options</label>
               {options.map((opt, i) => (
@@ -357,6 +401,7 @@ function AddQuestion() {
               ))}
             </div>
 
+            {/* Answer */}
             <div className="col-md-6">
               <label className="form-label">Correct Answer</label>
               <input
@@ -367,6 +412,7 @@ function AddQuestion() {
               />
             </div>
 
+            {/* Explanation */}
             <div className="col-md-6">
               <label className="form-label">Explanation (optional)</label>
               <textarea
@@ -376,6 +422,35 @@ function AddQuestion() {
               />
             </div>
 
+            {/* ✅ Image Upload */}
+            <div className="col-12 mt-3">
+              <label className="form-label">Question Image (optional)</label>
+
+              {preview && (
+                <div className="mb-2 text-center">
+                  <img
+                    src={preview}
+                    alt="Preview"
+                    style={{
+                      maxWidth: "200px",
+                      maxHeight: "150px",
+                      borderRadius: "6px",
+                      objectFit: "cover",
+                    }}
+                  />
+                  <div className="text-success small mt-1">Image Selected</div>
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                className="form-control"
+                onChange={handleImageChange}
+              />
+            </div>
+
+            {/* Submit */}
             <div className="col-12">
               <button className="btn btn-warning w-100" disabled={loading}>
                 {loading ? "Adding..." : "Add Question"}
@@ -387,6 +462,7 @@ function AddQuestion() {
     </div>
   );
 }
+
 
 /* =========================
    MANAGE TABLES (CRUD + CASCADE)
@@ -452,22 +528,43 @@ function ManageData() {
   }, [chapterId]);
 
   /* ---------- UPDATE ---------- */
-  async function handleUpdate(type, entity) {
-    try {
-      if (type === "subject") {
-        await api.put(`/admin/subjects/${entity._id}`, { name: entity.name, price: entity.price });
-        await loadSubjects();
-      } else if (type === "chapter") {
-        await api.put(`/admin/chapters/${entity._id}`, { name: entity.name });
-        await loadChapters();
-      } else if (type === "question") {
-        await api.put(`/admin/questions/${entity._id}`, entity);
-        await loadQuestions();
+  async function handleUpdate(type, entityOrFormData, isFormData = false) {
+  try {
+    if (type === "subject") {
+      await api.put(`/admin/subjects/${entityOrFormData._id}`, {
+        name: entityOrFormData.name,
+        price: entityOrFormData.price,
+        overview: entityOrFormData.overview || "",
+      });
+      await loadSubjects();
+    } else if (type === "chapter") {
+      await api.put(`/admin/chapters/${entityOrFormData._id}`, {
+        name: entityOrFormData.name,
+      });
+      await loadChapters();
+    } else if (type === "question") {
+      const id =
+        entityOrFormData instanceof FormData
+          ? entityOrFormData.get("_id")
+          : entityOrFormData._id;
+
+      if (isFormData) {
+        await api.put(`/admin/questions/${id}`, entityOrFormData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        await api.put(`/admin/questions/${id}`, entityOrFormData);
       }
-    } finally {
-      setEditModal({ open: false, entity: null, type: "" });
+      await loadQuestions();
     }
+  } catch (err) {
+    console.error("Update error:", err);
+    alert(`❌ Failed to update ${type}`);
+  } finally {
+    setEditModal({ open: false, entity: null, type: "" });
   }
+}
+
 
   /* ---------- DELETE (CASCADE) ---------- */
   async function deleteQuestion(qid) {
@@ -718,6 +815,8 @@ function confirmAction(msg, fn) {
    ========================= */
 function EditModal({ type, entity, onClose, onSave }) {
   const [form, setForm] = useState({ ...entity });
+  const [newImage, setNewImage] = useState(null);
+  const [preview, setPreview] = useState(null);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -728,30 +827,43 @@ function EditModal({ type, entity, onClose, onSave }) {
       ? "Edit Chapter"
       : "Edit Question";
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setNewImage(file);
+    setPreview(URL.createObjectURL(file));
+  };
+
   const onSubmit = (e) => {
     e.preventDefault();
-    onSave(form);
+
+    // ✅ For questions, send FormData if image is included
+    if (type === "question") {
+      const formData = new FormData();
+      formData.append("_id", form._id);
+      Object.entries(form).forEach(([key, val]) => {
+        if (key === "options") formData.append("options", JSON.stringify(val));
+        else if (val !== undefined && val !== null) formData.append(key, val);
+      });
+      if (newImage) formData.append("image", newImage);
+      onSave(formData, true); // mark as FormData
+    } else {
+      onSave(form);
+    }
   };
 
   return (
-    <div
-      className="modal d-block"
-      tabIndex="-1"
-      style={{ background: "rgba(0,0,0,.35)" }}
-    >
+    <div className="modal d-block" tabIndex="-1" style={{ background: "rgba(0,0,0,.35)" }}>
       <div className="modal-dialog modal-lg modal-dialog-centered">
         <div className="modal-content">
           <form onSubmit={onSubmit}>
             <div className="modal-header">
               <h5 className="modal-title">{title}</h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={onClose}
-              ></button>
+              <button type="button" className="btn-close" onClick={onClose}></button>
             </div>
 
             <div className="modal-body">
+              {/* SUBJECT */}
               {type === "subject" && (
                 <>
                   <div className="row g-3">
@@ -775,14 +887,11 @@ function EditModal({ type, entity, onClose, onSave }) {
                       />
                     </div>
                   </div>
-
-                  {/* ✅ Overview Textarea */}
                   <div className="mt-3">
                     <label className="form-label">Overview / Syllabus</label>
                     <textarea
                       className="form-control"
                       rows={3}
-                      placeholder="Enter or edit overview for this subject"
                       value={form.overview || ""}
                       onChange={(e) => set("overview", e.target.value)}
                     />
@@ -790,6 +899,7 @@ function EditModal({ type, entity, onClose, onSave }) {
                 </>
               )}
 
+              {/* CHAPTER */}
               {type === "chapter" && (
                 <div className="mb-3">
                   <label className="form-label">Chapter Name</label>
@@ -802,6 +912,7 @@ function EditModal({ type, entity, onClose, onSave }) {
                 </div>
               )}
 
+              {/* QUESTION */}
               {type === "question" && (
                 <div className="row g-3">
                   <div className="col-md-4">
@@ -815,6 +926,7 @@ function EditModal({ type, entity, onClose, onSave }) {
                       <option value="PYQ">PYQ</option>
                     </select>
                   </div>
+
                   <div className="col-12">
                     <label className="form-label">Question</label>
                     <textarea
@@ -824,6 +936,7 @@ function EditModal({ type, entity, onClose, onSave }) {
                       required
                     />
                   </div>
+
                   <div className="col-12">
                     <label className="form-label">Options</label>
                     {(form.options || ["", "", "", ""]).map((opt, i) => (
@@ -839,6 +952,7 @@ function EditModal({ type, entity, onClose, onSave }) {
                       />
                     ))}
                   </div>
+
                   <div className="col-md-6">
                     <label className="form-label">Answer</label>
                     <input
@@ -848,6 +962,7 @@ function EditModal({ type, entity, onClose, onSave }) {
                       required
                     />
                   </div>
+
                   <div className="col-md-6">
                     <label className="form-label">Explanation</label>
                     <textarea
@@ -856,16 +971,56 @@ function EditModal({ type, entity, onClose, onSave }) {
                       onChange={(e) => set("explanation", e.target.value)}
                     />
                   </div>
+
+                  {/* ✅ Image Upload */}
+                  <div className="col-12 mt-3">
+                    <label className="form-label">Question Image (optional)</label>
+
+                    {form.imageUrl && !preview && (
+                      <div className="mb-2 text-center">
+                        <img
+                          src={form.imageUrl}
+                          alt="Current"
+                          style={{
+                            maxWidth: "200px",
+                            maxHeight: "150px",
+                            borderRadius: "6px",
+                            objectFit: "cover",
+                          }}
+                        />
+                        <div className="text-muted small mt-1">Current Image</div>
+                      </div>
+                    )}
+
+                    {preview && (
+                      <div className="mb-2 text-center">
+                        <img
+                          src={preview}
+                          alt="Preview"
+                          style={{
+                            maxWidth: "200px",
+                            maxHeight: "150px",
+                            borderRadius: "6px",
+                            objectFit: "cover",
+                          }}
+                        />
+                        <div className="text-success small mt-1">New Image Selected</div>
+                      </div>
+                    )}
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="form-control"
+                      onChange={handleImageChange}
+                    />
+                  </div>
                 </div>
               )}
             </div>
 
             <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={onClose}
-              >
+              <button type="button" className="btn btn-outline-secondary" onClick={onClose}>
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary">
@@ -878,3 +1033,4 @@ function EditModal({ type, entity, onClose, onSave }) {
     </div>
   );
 }
+

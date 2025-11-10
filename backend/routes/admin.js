@@ -1,4 +1,3 @@
-// routes/adminRoutes.js
 import express from "express";
 import {
   addSubject,
@@ -17,36 +16,37 @@ import {
   removeCourse,
 } from "../controllers/adminController.js";
 import { auth, adminOnly } from "../middleware/auth.js";
+import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
-// ✅ Protect all admin routes
+// ✅ Secure all routes
 router.use(auth, adminOnly);
 
-// ================== ADMIN DASHBOARD ==================
+// DASHBOARD
 router.get("/dashboard", getAdminDashboard);
 
-// ================== USER MANAGEMENT ==================
+// USERS
 router.get("/users", getAllUsers);
 router.delete("/users/:id", deleteUser);
 
-// ================== COURSE MANAGEMENT ==================
+// COURSES
 router.post("/assign-course", assignCourse);
 router.post("/remove-course", removeCourse);
 
-// ================== SUBJECT CRUD ==================
+// SUBJECTS
 router.post("/subjects", addSubject);
 router.put("/subjects/:id", updateSubject);
 router.delete("/subjects/:id", deleteSubject);
 
-// ================== CHAPTER CRUD ==================
+// CHAPTERS
 router.post("/chapters", addChapter);
 router.put("/chapters/:id", updateChapter);
 router.delete("/chapters/:id", deleteChapter);
 
-// ================== QUESTION CRUD ==================
-router.post("/questions", addQuestion);
-router.put("/questions/:id", updateQuestion);
+// QUESTIONS (with image upload)
+router.post("/questions", upload.single("image"), addQuestion);
+router.put("/questions/:id", upload.single("image"), updateQuestion);
 router.delete("/questions/:id", deleteQuestion);
 
 export default router;
