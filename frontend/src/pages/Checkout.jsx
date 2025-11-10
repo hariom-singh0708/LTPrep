@@ -34,17 +34,43 @@ export default function Checkout() {
   }, [subjectId]);
 
   const handlePay = async () => {
-    if (!subject) return;
-    setPaying(true);
-    try {
-      const { data } = await api.post("/payment/initiate", { subjectId });
-      window.location.href = data.redirectUrl; // redirect to PhonePe checkout
-    } catch (e) {
-      alert(e?.response?.data?.message || "Payment failed");
-    } finally {
-      setPaying(false);
-    }
-  };
+  if (!subject) return;
+  setPaying(true);
+  try {
+    const { data } = await api.post("/payment/initiate", { subjectId });
+    const { redirectUrl, transactionId } = data;
+
+    // Open QR/PhonePe page in a new tab
+    window.open(redirectUrl, "_blank");
+
+    // Start polling payment status
+    let attempts = 0;
+    const maxAttempts = 10; // poll 10 times
+    const poll = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await api.post("/payment/verify", { transactionId });
+        const status = res.data?.data?.data?.state || res.data?.data?.code;
+
+        if (status === "COMPLETED" || status === "PAYMENT_SUCCESS") {
+          clearInterval(poll);
+          alert("✅ Payment Successful! Redirecting...");
+          navigate(`/payment-success?transactionId=${transactionId}`);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(poll);
+          alert("❌ Payment not confirmed yet. Please refresh or contact support.");
+        }
+      } catch (err) {
+        console.error(err);
+        clearInterval(poll);
+      }
+    }, 3000); // every 3 sec
+  } catch (e) {
+    alert(e?.response?.data?.message || "Payment failed");
+  } finally {
+    setPaying(false);
+  }
+};
 
   if (loading)
     return (
