@@ -5,6 +5,9 @@ import Transaction from "../models/Transaction.js";
 import User from "../models/User.js";
 import cloudinary from "../config/cloudinary.js";
 
+/* =========================
+   SUBJECT MANAGEMENT
+   ========================= */
 export const addSubject = async (req, res) => {
   try {
     const { name, price, overview } = req.body;
@@ -40,20 +43,151 @@ export const updateSubject = async (req, res) => {
   }
 };
 
+/* =========================
+   CHAPTER MANAGEMENT
+   ========================= */
 
+// ✅ Add new chapter (no PDF initially)
 export const addChapter = async (req, res) => {
   try {
     const { subjectId, name } = req.body;
+
     if (!subjectId || !name)
       return res.status(400).json({ message: "subjectId & name required" });
 
-    const chapter = await Chapter.create({ subjectId, name });
+    const chapter = await Chapter.create({
+      subjectId,
+      name,
+      studyMaterials: [],
+      mockTests: [],
+    });
+
     res.status(201).json(chapter);
   } catch (err) {
     console.error("Add chapter error:", err);
     res.status(500).json({ message: "Failed to add chapter" });
   }
 };
+
+// ✅ Update chapter name only
+export const updateChapter = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    const updated = await Chapter.findByIdAndUpdate(id, { name }, { new: true });
+    if (!updated)
+      return res.status(404).json({ message: "Chapter not found" });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Update chapter error:", err);
+    res.status(500).json({ message: "Failed to update chapter" });
+  }
+};
+
+/* =========================
+   MULTIPLE PDF HANDLING
+   ========================= */
+
+// ➕ Add a Study Material PDF (append)
+export const addStudyMaterialPdf = async (req, res) => {
+  try {
+    const { id } = req.params; // chapterId
+    const { title, url } = req.body;
+    if (!title || !url)
+      return res.status(400).json({ message: "Title and URL required" });
+
+    const chapter = await Chapter.findById(id);
+    if (!chapter) return res.status(404).json({ message: "Chapter not found" });
+
+    chapter.studyMaterials.push({ title, url });
+    await chapter.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Study material added successfully",
+      studyMaterials: chapter.studyMaterials,
+    });
+  } catch (err) {
+    console.error("Add Study Material error:", err);
+    res.status(500).json({ message: "Failed to add Study Material PDF" });
+  }
+};
+
+// ➕ Add a Mock Test PDF (append)
+export const addMockTestPdf = async (req, res) => {
+  try {
+    const { id } = req.params; // chapterId
+    const { title, url } = req.body;
+    if (!title || !url)
+      return res.status(400).json({ message: "Title and URL required" });
+
+    const chapter = await Chapter.findById(id);
+    if (!chapter) return res.status(404).json({ message: "Chapter not found" });
+
+    chapter.mockTests.push({ title, url });
+    await chapter.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Mock test added successfully",
+      mockTests: chapter.mockTests,
+    });
+  } catch (err) {
+    console.error("Add Mock Test error:", err);
+    res.status(500).json({ message: "Failed to add Mock Test PDF" });
+  }
+};
+
+// 🗑️ Delete a specific PDF by its ID
+export const deleteChapterPdf = async (req, res) => {
+  try {
+    const { id, type, pdfId } = req.params; // /chapters/:id/pdf/:type/:pdfId
+    const chapter = await Chapter.findById(id);
+    if (!chapter) return res.status(404).json({ message: "Chapter not found" });
+
+    if (type === "study") {
+      chapter.studyMaterials = chapter.studyMaterials.filter(
+        (pdf) => pdf._id.toString() !== pdfId
+      );
+    } else if (type === "mock") {
+      chapter.mockTests = chapter.mockTests.filter(
+        (pdf) => pdf._id.toString() !== pdfId
+      );
+    } else {
+      return res.status(400).json({ message: "Invalid PDF type" });
+    }
+
+    await chapter.save();
+    res.json({ success: true, message: "PDF deleted successfully", chapter });
+  } catch (err) {
+    console.error("Delete Chapter PDF error:", err);
+    res.status(500).json({ message: "Failed to delete PDF" });
+  }
+};
+
+// 📜 Get all PDFs for a chapter
+export const getChapterPdfs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const chapter = await Chapter.findById(id).select("name studyMaterials mockTests");
+
+    if (!chapter)
+      return res.status(404).json({ message: "Chapter not found" });
+
+    res.json({
+      success: true,
+      chapterName: chapter.name,
+      studyMaterials: chapter.studyMaterials || [],
+      mockTests: chapter.mockTests || [],
+    });
+  } catch (err) {
+    console.error("Get Chapter PDFs error:", err);
+    res.status(500).json({ message: "Failed to fetch Chapter PDFs" });
+  }
+};
+
 
 // ✅ ADD QUESTION
 export const addQuestion = async (req, res) => {
@@ -144,21 +278,6 @@ export const updateQuestion = async (req, res) => {
       message: "Failed to update question",
       error: err.message,
     });
-  }
-};
-
-
-
-export const updateChapter = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name } = req.body;
-    const updated = await Chapter.findByIdAndUpdate(id, { name }, { new: true });
-    if (!updated) return res.status(404).json({ message: "Chapter not found" });
-    res.json(updated);
-  } catch (err) {
-    console.error("Update chapter error:", err);
-    res.status(500).json({ message: "Failed to update chapter" });
   }
 };
 
@@ -375,75 +494,5 @@ export const removeCourse = async (req, res) => {
   } catch (err) {
     console.error("Remove course error:", err);
     res.status(500).json({ message: "Failed to remove course" });
-  }
-};
-
-
-
-/**
- * Add a PDF (Drive/Cloudinary link) to a Subject
- */
-export const addSubjectPdf = async (req, res) => {
-  try {
-    const { id } = req.params; // subjectId
-    const { title, url } = req.body;
-
-    if (!title || !url) {
-      return res.status(400).json({ message: "Title and URL are required" });
-    }
-
-    const subject = await Subject.findById(id);
-    if (!subject) {
-      return res.status(404).json({ message: "Subject not found" });
-    }
-
-    subject.pdfs.push({ title, url });
-    await subject.save();
-
-    res.status(201).json({ message: "PDF added successfully", subject });
-  } catch (err) {
-    console.error("Add subject PDF error:", err);
-    res.status(500).json({ message: "Failed to add PDF" });
-  }
-};
-
-/**
- * Delete a specific PDF from a Subject
- */
-export const deleteSubjectPdf = async (req, res) => {
-  try {
-    const { id, pdfId } = req.params; // subjectId, pdfId
-
-    const subject = await Subject.findById(id);
-    if (!subject) {
-      return res.status(404).json({ message: "Subject not found" });
-    }
-
-    subject.pdfs = subject.pdfs.filter((pdf) => pdf._id.toString() !== pdfId);
-    await subject.save();
-
-    res.json({ message: "PDF deleted successfully", subject });
-  } catch (err) {
-    console.error("Delete subject PDF error:", err);
-    res.status(500).json({ message: "Failed to delete PDF" });
-  }
-};
-
-/**
- * Get all PDFs of a specific Subject
- */
-export const getSubjectPdfs = async (req, res) => {
-  try {
-    const { id } = req.params; // subjectId
-
-    const subject = await Subject.findById(id).select("name pdfs");
-    if (!subject) {
-      return res.status(404).json({ message: "Subject not found" });
-    }
-
-    res.json(subject.pdfs);
-  } catch (err) {
-    console.error("Get subject PDFs error:", err);
-    res.status(500).json({ message: "Failed to fetch PDFs" });
   }
 };

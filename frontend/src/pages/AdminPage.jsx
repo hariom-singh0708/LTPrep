@@ -9,6 +9,7 @@ import {
   FaPlus,
   FaCubes,
   FaFilePdf,
+  FaEye,
 } from "react-icons/fa";
 
 /* =========================
@@ -40,10 +41,11 @@ export default function AdminPage() {
       </div>
 
       <div className="row g-4 mb-4">
-        <div className="col-12">
-          <SubjectPdfsManagerWrapper />
-        </div>
-      </div>
+  <div className="col-12">
+    <ChapterPdfsManagerWrapper />
+  </div>
+</div>
+
 
       <div className="row g-4 mb-4">
         <div className="col-12">
@@ -246,121 +248,160 @@ function AddChapter() {
   );
 }
 
+
 /* =========================
-   SUBJECT PDFs WRAPPER
+   CHAPTER PDFs WRAPPER
    ========================= */
-function SubjectPdfsManagerWrapper() {
+function ChapterPdfsManagerWrapper() {
   const [subjects, setSubjects] = useState([]);
   const [subjectId, setSubjectId] = useState("");
+  const [chapters, setChapters] = useState([]);
+  const [chapterId, setChapterId] = useState("");
 
   useEffect(() => {
-    api.get("/subjects").then(({ data }) => {
+    (async () => {
+      const { data } = await api.get("/subjects");
       setSubjects(data);
       if (data[0]) setSubjectId(data[0]._id);
-    });
+    })();
   }, []);
+
+  useEffect(() => {
+    if (!subjectId) return;
+    (async () => {
+      const { data } = await api.get(`/subjects/${subjectId}/chapters`);
+      setChapters(data);
+      if (data[0]) setChapterId(data[0]._id);
+    })();
+  }, [subjectId]);
 
   return (
     <div className="card border-0 shadow-lg rounded-4">
       <div className="card-body p-4">
         <h5 className="card-title fw-bold text-danger mb-3">
           <FaFilePdf className="me-2" />
-          Add Subject PDFs
+          Manage Chapter PDFs
         </h5>
-        <div className="form-floating mb-4">
-          <select
-            className="form-select"
-            id="pdfSubjectSelect"
-            value={subjectId}
-            onChange={(e) => setSubjectId(e.target.value)}
-          >
-            {subjects.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="pdfSubjectSelect">Select Subject</label>
+
+        {/* Select Subject + Chapter */}
+        <div className="row g-3 mb-4">
+          <div className="col-md-6">
+            <div className="form-floating">
+              <select
+                className="form-select"
+                id="pdfSubjectSelect"
+                value={subjectId}
+                onChange={(e) => setSubjectId(e.target.value)}
+              >
+                {subjects.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="pdfSubjectSelect">Select Subject</label>
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="form-floating">
+              <select
+                className="form-select"
+                id="pdfChapterSelect"
+                value={chapterId}
+                onChange={(e) => setChapterId(e.target.value)}
+              >
+                {chapters.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="pdfChapterSelect">Select Chapter</label>
+            </div>
+          </div>
         </div>
-        {subjectId && <SubjectPdfsManager subjectId={subjectId} />}
+
+        {chapterId && <ChapterPdfsManager chapterId={chapterId} />}
       </div>
     </div>
   );
 }
 
 /* =========================
-   SUBJECT PDFs MANAGER
+   CHAPTER PDFs MANAGER
    ========================= */
-function SubjectPdfsManager({ subjectId }) {
-  const [pdfs, setPdfs] = useState([]);
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
+function ChapterPdfsManager({ chapterId }) {
+  const [pdfs, setPdfs] = useState({ studyMaterials: [], mockTests: [] });
+  const [studyTitle, setStudyTitle] = useState("");
+  const [studyUrl, setStudyUrl] = useState("");
+  const [mockTitle, setMockTitle] = useState("");
+  const [mockUrl, setMockUrl] = useState("");
   const [msg, setMsg] = useState("");
 
   async function loadPdfs() {
     try {
-      const { data } = await api.get(`/admin/subjects/${subjectId}/pdfs`);
-      setPdfs(data);
+      const { data } = await api.get(`/admin/chapters/${chapterId}/pdfs`);
+      setPdfs({
+        studyMaterials: data.studyMaterials || [],
+        mockTests: data.mockTests || [],
+      });
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load PDFs:", err);
     }
   }
 
   useEffect(() => {
-    if (subjectId) loadPdfs();
-  }, [subjectId]);
+    if (chapterId) loadPdfs();
+  }, [chapterId]);
 
-  async function addPdf(e) {
+  // ✅ Add Study Material PDF
+  async function addStudyMaterial(e) {
     e.preventDefault();
     try {
-      await api.post(`/admin/subjects/${subjectId}/pdfs`, { title, url });
-      setMsg("✅ PDF added successfully!");
-      setTitle("");
-      setUrl("");
+      await api.post(`/admin/chapters/${chapterId}/study-material`, {
+        title: studyTitle,
+        url: studyUrl,
+      });
+      setMsg("✅ Study Material added successfully!");
+      setStudyTitle("");
+      setStudyUrl("");
       await loadPdfs();
     } catch {
-      setMsg("❌ Failed to add PDF");
+      setMsg("❌ Failed to add Study Material");
+    }
+  }
+
+  // ✅ Add Mock Test PDF
+  async function addMockTest(e) {
+    e.preventDefault();
+    try {
+      await api.post(`/admin/chapters/${chapterId}/mock-test`, {
+        title: mockTitle,
+        url: mockUrl,
+      });
+      setMsg("✅ Mock Test added successfully!");
+      setMockTitle("");
+      setMockUrl("");
+      await loadPdfs();
+    } catch {
+      setMsg("❌ Failed to add Mock Test");
+    }
+  }
+
+  // ✅ Delete PDF
+  async function deletePdf(type, pdfId) {
+    if (!confirm("Are you sure you want to delete this PDF?")) return;
+    try {
+      await api.delete(`/admin/chapters/${chapterId}/pdf/${type}/${pdfId}`);
+      setMsg("✅ PDF deleted successfully");
+      await loadPdfs();
+    } catch {
+      setMsg("❌ Failed to delete PDF");
     }
   }
 
   return (
-    <>
-      <form onSubmit={addPdf} className="row g-3 mb-3">
-        <div className="col-md-5">
-          <div className="form-floating">
-            <input
-              type="text"
-              className="form-control"
-              id="pdfTitle"
-              placeholder="PDF Title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-            <label htmlFor="pdfTitle">PDF Title</label>
-          </div>
-        </div>
-        <div className="col-md-5">
-          <div className="form-floating">
-            <input
-              type="url"
-              className="form-control"
-              id="pdfUrl"
-              placeholder="PDF Link"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              required
-            />
-            <label htmlFor="pdfUrl">PDF Link</label>
-          </div>
-        </div>
-        <div className="col-md-2 d-grid">
-          <button className="btn btn-danger fw-semibold" type="submit">
-            Add PDF
-          </button>
-        </div>
-      </form>
-
+    <div className="bg-light p-3 rounded-3 shadow-sm">
       {msg && (
         <div
           className={`alert ${
@@ -371,52 +412,150 @@ function SubjectPdfsManager({ subjectId }) {
         </div>
       )}
 
-      <table className="table table-hover align-middle text-center border">
-        <thead className="table-danger">
-          <tr>
-            <th>#</th>
-            <th>Title</th>
-            <th>View</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pdfs.map((p, i) => (
-            <tr key={p._id}>
-              <td>{i + 1}</td>
-              <td>{p.title}</td>
-              <td>
-                <a
-                  href={p.url}
-                  className="btn btn-sm btn-outline-danger"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View PDF
-                </a>
-              </td>
-              <td>
-                <button
-                  className="btn btn-sm btn-outline-dark"
-                  onClick={() => api.delete(`/admin/subjects/${subjectId}/pdfs/${p._id}`).then(loadPdfs)}
-                >
-                  <FaTrash /> Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-          {!pdfs.length && (
+      {/* =========================
+          📘 Study Materials Section
+      ========================= */}
+      <h6 className="fw-bold text-success mt-3">Study Materials</h6>
+      <form onSubmit={addStudyMaterial} className="row g-3 mb-3">
+        <div className="col-md-5">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Title"
+            value={studyTitle}
+            onChange={(e) => setStudyTitle(e.target.value)}
+            required
+          />
+        </div>
+        <div className="col-md-5">
+          <input
+            type="url"
+            className="form-control"
+            placeholder="Google Drive Link"
+            value={studyUrl}
+            onChange={(e) => setStudyUrl(e.target.value)}
+            required
+          />
+        </div>
+        <div className="col-md-2 d-grid">
+          <button className="btn btn-success fw-semibold">
+            <FaPlus className="me-1" /> Add
+          </button>
+        </div>
+      </form>
+
+      {pdfs.studyMaterials.length > 0 ? (
+        <table className="table table-bordered table-sm align-middle">
+          <thead className="table-light">
             <tr>
-              <td colSpan="4" className="text-muted">
-                No PDFs added yet
-              </td>
+              <th>#</th>
+              <th>Title</th>
+              <th>Actions</th>
             </tr>
-          )}
-        </tbody>
-      </table>
-    </>
+          </thead>
+          <tbody>
+            {pdfs.studyMaterials.map((pdf, i) => (
+              <tr key={pdf._id}>
+                <td>{i + 1}</td>
+                <td>{pdf.title}</td>
+                <td>
+                  <a
+                    href={pdf.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-sm btn-outline-success me-2"
+                  >
+                    <FaEye /> View
+                  </a>
+                  <button
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={() => deletePdf("study", pdf._id)}
+                  >
+                    <FaTrash /> Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="text-muted small">No Study Materials added yet</p>
+      )}
+
+      {/* =========================
+          🧠 Mock Tests Section
+      ========================= */}
+      <h6 className="fw-bold text-primary mt-4">Mock Tests</h6>
+      <form onSubmit={addMockTest} className="row g-3 mb-3">
+        <div className="col-md-5">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Title"
+            value={mockTitle}
+            onChange={(e) => setMockTitle(e.target.value)}
+            required
+          />
+        </div>
+        <div className="col-md-5">
+          <input
+            type="url"
+            className="form-control"
+            placeholder="Google Drive Link"
+            value={mockUrl}
+            onChange={(e) => setMockUrl(e.target.value)}
+            required
+          />
+        </div>
+        <div className="col-md-2 d-grid">
+          <button className="btn btn-primary fw-semibold">
+            <FaPlus className="me-1" /> Add
+          </button>
+        </div>
+      </form>
+
+      {pdfs.mockTests.length > 0 ? (
+        <table className="table table-bordered table-sm align-middle">
+          <thead className="table-light">
+            <tr>
+              <th>#</th>
+              <th>Title</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pdfs.mockTests.map((pdf, i) => (
+              <tr key={pdf._id}>
+                <td>{i + 1}</td>
+                <td>{pdf.title}</td>
+                <td>
+                  <a
+                    href={pdf.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-sm btn-outline-primary me-2"
+                  >
+                    <FaEye /> View
+                  </a>
+                  <button
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={() => deletePdf("mock", pdf._id)}
+                  >
+                    <FaTrash /> Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="text-muted small">No Mock Tests added yet</p>
+      )}
+    </div>
   );
 }
+
+
 
 /* =========================
    ADD QUESTION (Enhanced)

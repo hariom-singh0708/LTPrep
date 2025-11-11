@@ -1,31 +1,47 @@
 import express from "express";
 import {
+  // SUBJECTS
   addSubject,
-  addChapter,
-  addQuestion,
   updateSubject,
-  updateChapter,
-  updateQuestion,
   deleteSubject,
+
+
+  // CHAPTERS
+  addChapter,
+  updateChapter,
   deleteChapter,
+  getChapterPdfs,
+  addStudyMaterialPdf,
+  addMockTestPdf,
+  deleteChapterPdf,
+
+  // QUESTIONS
+  addQuestion,
+  updateQuestion,
   deleteQuestion,
+
+  // DASHBOARD / USERS / COURSES
   getAdminDashboard,
   getAllUsers,
   deleteUser,
   assignCourse,
   removeCourse,
-  addSubjectPdf,      // 👈 new
-  deleteSubjectPdf,   // 👈 new
-  getSubjectPdfs,     // 👈 new
 } from "../controllers/adminController.js";
+
 import { auth, adminOnly } from "../middleware/auth.js";
 import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
-router.get("/subjects/:id/pdfs", getSubjectPdfs);          // Get all PDFs
+/* =========================
+   PUBLIC ROUTES
+   ========================= */
+// Allow fetching PDFs (no login required)
+router.get("/chapters/:id/pdfs", getChapterPdfs);
 
-// ✅ Secure all routes
+/* =========================
+   PROTECTED ADMIN ROUTES
+   ========================= */
 router.use(auth, adminOnly);
 
 // DASHBOARD
@@ -44,14 +60,16 @@ router.post("/subjects", addSubject);
 router.put("/subjects/:id", updateSubject);
 router.delete("/subjects/:id", deleteSubject);
 
-// SUBJECT PDFs
-router.post("/subjects/:id/pdfs", addSubjectPdf);          // Add a PDF
-router.delete("/subjects/:id/pdfs/:pdfId", deleteSubjectPdf); // Delete a specific PDF
 
 // CHAPTERS
 router.post("/chapters", addChapter);
 router.put("/chapters/:id", updateChapter);
 router.delete("/chapters/:id", deleteChapter);
+
+// ✅ NEW MULTIPLE PDF ROUTES (Chapter-level)
+router.post("/chapters/:id/study-material", addStudyMaterialPdf);
+router.post("/chapters/:id/mock-test", addMockTestPdf);
+router.delete("/chapters/:id/pdf/:type/:pdfId", deleteChapterPdf);
 
 // QUESTIONS (with image upload)
 router.post("/questions", upload.single("image"), addQuestion);

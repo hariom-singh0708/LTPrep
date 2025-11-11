@@ -14,15 +14,20 @@ import {
   FaFilePdf,
 } from "react-icons/fa";
 
+/* =========================
+   📘 Subject Page
+   ========================= */
 export default function SubjectPage() {
   const { id: subjectId } = useParams();
   const [chapters, setChapters] = useState([]);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [type, setType] = useState("Expected");
   const [questions, setQuestions] = useState([]);
-  const [pdfs, setPdfs] = useState([]);
   const [lockedInfo, setLockedInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [chapterPdfs, setChapterPdfs] = useState({});
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfType, setPdfType] = useState(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -46,7 +51,18 @@ export default function SubjectPage() {
     })();
   }, [subjectId]);
 
-  // ✅ Load questions
+  // ✅ Load chapter PDFs
+  async function loadChapterPdfs(chapterId) {
+    try {
+      const { data } = await api.get(`/admin/chapters/${chapterId}/pdfs`);
+      setChapterPdfs(data);
+    } catch (err) {
+      console.error("Failed to load chapter PDFs:", err);
+      setChapterPdfs({});
+    }
+  }
+
+  // ✅ Load questions + PDFs
   useEffect(() => {
     if (!selectedChapter) return;
     (async () => {
@@ -58,6 +74,7 @@ export default function SubjectPage() {
         });
         setQuestions(data.questions || []);
         if (data.locked) setLockedInfo(data);
+        await loadChapterPdfs(selectedChapter);
       } catch (e) {
         const msg = e?.response?.data?.message;
         setQuestions([]);
@@ -67,38 +84,6 @@ export default function SubjectPage() {
       }
     })();
   }, [selectedChapter, type]);
-
-  // ✅ Load PDFs related to this subject
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get(`/admin/subjects/${subjectId}/pdfs`);
-        setPdfs(data);
-      } catch (err) {
-        console.error("Failed to load PDFs:", err);
-      }
-    })();
-  }, [subjectId]);
-
-  // ✅ Download All Questions as PDF
-  const handleDownloadPDF = async () => {
-    try {
-      const response = await api.get("/pdf/questions", {
-        params: { chapterId: selectedChapter, type },
-        responseType: "blob",
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `${type}_Questions.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (err) {
-      console.error("Download error:", err);
-      alert("❌ Failed to download PDF");
-    }
-  };
 
   return (
     <div className="container-fluid py-4">
@@ -167,17 +152,15 @@ export default function SubjectPage() {
                 </h5>
                 <div className="btn-group">
                   <button
-                    className={`btn btn-sm ${
-                      type === "Expected" ? "btn-primary" : "btn-outline-primary"
-                    }`}
+                    className={`btn btn-sm ${type === "Expected" ? "btn-primary" : "btn-outline-primary"
+                      }`}
                     onClick={() => setType("Expected")}
                   >
                     Expected
                   </button>
                   <button
-                    className={`btn btn-sm ${
-                      type === "PYQ" ? "btn-primary" : "btn-outline-primary"
-                    }`}
+                    className={`btn btn-sm ${type === "PYQ" ? "btn-primary" : "btn-outline-primary"
+                      }`}
                     onClick={() => setType("PYQ")}
                   >
                     PYQ
@@ -202,9 +185,7 @@ export default function SubjectPage() {
 
               {!loading && !questions.length && !lockedInfo?.locked && (
                 <div className="text-center py-5">
-                  <p className="text-muted mb-1">
-                    No questions found for this chapter.
-                  </p>
+                  <p className="text-muted mb-1">No questions found for this chapter.</p>
                 </div>
               )}
 
@@ -215,64 +196,45 @@ export default function SubjectPage() {
                 ))}
               </div>
 
-              {/* ====== Download All Questions as PDF ====== */}
-              {questions.length > 0 && (
-                <div className="text-end mt-4">
+              {/* ====== Chapter PDF Buttons ====== */}
+              {!loading && !lockedInfo?.locked && (
+                <div className="d-flex justify-content-center gap-3 mt-4">
                   <button
-                    className="btn btn-outline-danger"
-                    onClick={handleDownloadPDF}
+                    className="btn btn-outline-success fw-semibold"
+                    onClick={() => {
+                      setPdfType("study");
+                      setShowPdfModal(true);
+                    }}
                   >
-                    <FaDownload className="me-2" />
-                    Download All as PDF
-                  </button>
-                </div>
-              )}
-
-              {/* ====== Study PDFs Section ====== */}
-              {pdfs.length > 0 && hasAccess && (
-                <div className="mt-5">
-                  <h5 className="fw-bold text-primary mb-3">
                     <FaFilePdf className="me-2" />
-                    Study Materials / PDFs
-                  </h5>
-
-                  <div className="list-group">
-                    {pdfs.map((pdf) => (
-                      <div
-                        key={pdf._id}
-                        className="list-group-item d-flex justify-content-between align-items-center"
-                      >
-                        <div>
-                          <h6 className="mb-1">{pdf.title}</h6>
-                          <a
-                            href={pdf.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-decoration-none small text-success"
-                          >
-                            View in New Tab
-                          </a>
-                        </div>
-
-                        <a
-                          href={pdf.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download
-                          className="btn btn-outline-primary btn-sm"
-                        >
-                          <FaDownload className="me-2" />
-                          Download
-                        </a>
-                      </div>
-                    ))}
-                  </div>
+                    Study Material
+                  </button>
+                  <button
+                    className="btn btn-outline-primary fw-semibold"
+                    onClick={() => {
+                      setPdfType("mock");
+                      setShowPdfModal(true);
+                    }}
+                  >
+                    <FaFilePdf className="me-2" />
+                    Mock Test
+                  </button>
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* ====== Modal for PDFs ====== */}
+      {showPdfModal && (
+        <ChapterPdfsModal
+          show={showPdfModal}
+          onClose={() => setShowPdfModal(false)}
+          pdfs={chapterPdfs}
+          type={pdfType}
+        />
+      )}
     </div>
   );
 }
@@ -292,9 +254,8 @@ function Sidebar({ chapters, selectedChapter, setSelectedChapter, hasAccess, nav
           {chapters.map((c) => (
             <button
               key={c._id}
-              className={`list-group-item list-group-item-action ${
-                c._id === selectedChapter ? "active" : ""
-              }`}
+              className={`list-group-item list-group-item-action ${c._id === selectedChapter ? "active" : ""
+                }`}
               style={{
                 backgroundColor: c._id === selectedChapter ? "#0d6efd" : "#f8f9fa",
                 color: c._id === selectedChapter ? "#fff" : "#000",
@@ -422,3 +383,91 @@ function QuestionCard({ q, sno }) {
     </div>
   );
 }
+
+
+function ChapterPdfsModal({ show, onClose, pdfs, type }) {
+  if (!show) return null;
+
+  // ✅ Correct handling for new backend response
+  const list =
+    type === "study"
+      ? pdfs.studyMaterials || []
+      : pdfs.mockTests || [];
+
+  return (
+    <div
+      className="modal fade show"
+      style={{ display: "block", background: "rgba(0,0,0,0.6)" }}
+      tabIndex="-1"
+    >
+      <div className="modal-dialog modal-dialog-centered modal-lg">
+        <div className="modal-content rounded-4 border-0 shadow-lg">
+          <div
+            className={`modal-header ${type === "study" ? "bg-success" : "bg-primary"
+              } text-white rounded-top-4`}
+          >
+            <h5 className="modal-title">
+              <FaFilePdf className="me-2" />
+              {type === "study" ? "Study Material" : "Mock Test"} PDFs
+            </h5>
+            <button
+              type="button"
+              className="btn-close btn-close-white"
+              onClick={onClose}
+            ></button>
+          </div>
+
+          <div className="modal-body">
+            {list.length === 0 ? (
+              <div className="text-center text-muted py-3">
+                No {type === "study" ? "Study Materials" : "Mock Tests"} available.
+              </div>
+            ) : (
+              <table className="table table-bordered align-middle text-center">
+                <thead className="table-light">
+                  <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>View / Download</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((pdf, idx) => (
+                    <tr key={pdf._id || idx}>
+                      <td>{idx + 1}</td>
+                      <td>{pdf.title}</td>
+                      <td>
+                        <a
+                          href={pdf.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`btn btn-sm ${type === "study"
+                            ? "btn-outline-success"
+                            : "btn-outline-primary"
+                            }`}
+                        >
+                          <FaDownload className="me-1" /> View / Download
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="modal-footer border-0">
+            <button
+              type="button"
+              className="btn btn-secondary w-100 fw-semibold"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
