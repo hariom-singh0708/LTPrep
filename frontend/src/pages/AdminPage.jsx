@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../api/axios";
 import {
   FaBook,
@@ -8,20 +8,28 @@ import {
   FaTrash,
   FaPlus,
   FaCubes,
+  FaFilePdf,
 } from "react-icons/fa";
 
 /* =========================
-   TOP-LEVEL ADMIN PAGE
+   ENHANCED ADMIN DASHBOARD
    ========================= */
 export default function AdminPage() {
   return (
-    <div className="container py-4">
-      <h2 className="fw-bold mb-4 text-center text-primary">
+    <div
+      className="container py-5"
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(245,249,255,1) 0%, rgba(230,238,255,1) 100%)",
+        borderRadius: "20px",
+        boxShadow: "0 5px 20px rgba(0,0,0,0.1)",
+      }}
+    >
+      <h2 className="fw-bold mb-5 text-center text-primary">
         <FaCubes className="me-2" />
         Admin Dashboard
       </h2>
 
-      {/* Row 1: Add Subject + Add Chapter */}
       <div className="row g-4 mb-4">
         <div className="col-md-6">
           <AddSubject />
@@ -31,14 +39,18 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Row 2: Add Question */}
+      <div className="row g-4 mb-4">
+        <div className="col-12">
+          <SubjectPdfsManagerWrapper />
+        </div>
+      </div>
+
       <div className="row g-4 mb-4">
         <div className="col-12">
           <AddQuestion />
         </div>
       </div>
 
-      {/* Row 3: Manage Tables */}
       <div className="row g-4">
         <div className="col-12">
           <ManageData />
@@ -53,38 +65,39 @@ export default function AdminPage() {
    ========================= */
 function AddSubject() {
   const [name, setName] = useState("");
-  const [price, setPrice] = useState(0);
+  const [price, setPrice] = useState("");
   const [overview, setOverview] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    setMsg("");
     setLoading(true);
+    setMsg("");
     try {
       const { data } = await api.post("/admin/subjects", {
         name,
         price: Number(price),
-        overview, // ✅ send overview
+        overview,
       });
-      setMsg(`✅ Subject "${data.name}" added`);
+      setMsg(`✅ Subject "${data.name}" added successfully!`);
       setName("");
-      setPrice(0);
+      setPrice("");
       setOverview("");
       window.dispatchEvent(new CustomEvent("admin:refreshData"));
-    } catch (e) {
-      setMsg(`❌ ${e?.response?.data?.message || "Failed to add subject"}`);
+    } catch (err) {
+      setMsg(`❌ ${err?.response?.data?.message || "Failed to add subject"}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="card shadow-sm border-0 h-100">
-      <div className="card-body">
-        <h5 className="card-title text-primary d-flex align-items-center gap-2">
-          <FaBook /> Add Subject
+    <div className="card border-0 shadow-lg h-100 rounded-4">
+      <div className="card-body p-4">
+        <h5 className="card-title fw-bold text-primary mb-3">
+          <FaBook className="me-2" />
+          Add Subject
         </h5>
         {msg && (
           <div
@@ -96,40 +109,46 @@ function AddSubject() {
           </div>
         )}
         <form onSubmit={onSubmit}>
-          <div className="mb-2">
-            <label className="form-label">Subject Name</label>
+          <div className="form-floating mb-3">
             <input
+              type="text"
               className="form-control"
+              id="subjectName"
+              placeholder="Subject Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
+            <label htmlFor="subjectName">Subject Name</label>
           </div>
-          <div className="mb-2">
-            <label className="form-label">Price (₹)</label>
+          <div className="form-floating mb-3">
             <input
               type="number"
               className="form-control"
+              id="subjectPrice"
+              placeholder="Price"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               min="0"
               required
             />
+            <label htmlFor="subjectPrice">Price (₹)</label>
           </div>
-
-          {/* ✅ New Overview Field */}
-          <div className="mb-3">
-            <label className="form-label">Overview / Syllabus</label>
+          <div className="form-floating mb-3">
             <textarea
               className="form-control"
-              rows={3}
-              placeholder="Write a short description or syllabus for this subject"
+              id="subjectOverview"
+              placeholder="Overview"
+              style={{ height: "100px" }}
               value={overview}
               onChange={(e) => setOverview(e.target.value)}
-            />
+            ></textarea>
+            <label htmlFor="subjectOverview">Overview / Syllabus</label>
           </div>
-
-          <button className="btn btn-primary w-100" disabled={loading}>
+          <button
+            className="btn btn-primary w-100 fw-semibold py-2"
+            disabled={loading}
+          >
             {loading ? "Adding..." : "Add Subject"}
           </button>
         </form>
@@ -137,7 +156,6 @@ function AddSubject() {
     </div>
   );
 }
-
 
 /* =========================
    ADD CHAPTER
@@ -150,13 +168,10 @@ function AddChapter() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get("/subjects");
-        setSubjects(data);
-        if (data[0]) setSubjectId(data[0]._id);
-      } catch {}
-    })();
+    api.get("/subjects").then(({ data }) => {
+      setSubjects(data);
+      if (data[0]) setSubjectId(data[0]._id);
+    });
   }, []);
 
   const onSubmit = async (e) => {
@@ -165,32 +180,37 @@ function AddChapter() {
     setLoading(true);
     try {
       const { data } = await api.post("/admin/chapters", { subjectId, name });
-      setMsg(`✅ Chapter "${data.name}" added`);
+      setMsg(`✅ Chapter "${data.name}" added successfully!`);
       setName("");
       window.dispatchEvent(new CustomEvent("admin:refreshData"));
-    } catch (e) {
-      setMsg(`❌ ${e?.response?.data?.message || "Failed to add chapter"}`);
+    } catch (err) {
+      setMsg(`❌ ${err?.response?.data?.message || "Failed to add chapter"}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="card shadow-sm border-0 h-100">
-      <div className="card-body">
-        <h5 className="card-title text-success d-flex align-items-center gap-2">
-          <FaListAlt /> Add Chapter
+    <div className="card border-0 shadow-lg h-100 rounded-4">
+      <div className="card-body p-4">
+        <h5 className="card-title fw-bold text-success mb-3">
+          <FaListAlt className="me-2" />
+          Add Chapter
         </h5>
         {msg && (
-          <div className={`alert ${msg.startsWith("✅") ? "alert-success" : "alert-danger"} py-2`}>
+          <div
+            className={`alert ${
+              msg.startsWith("✅") ? "alert-success" : "alert-danger"
+            } py-2`}
+          >
             {msg}
           </div>
         )}
         <form onSubmit={onSubmit}>
-          <div className="mb-2">
-            <label className="form-label">Select Subject</label>
+          <div className="form-floating mb-3">
             <select
               className="form-select"
+              id="subjectSelect"
               value={subjectId}
               onChange={(e) => setSubjectId(e.target.value)}
             >
@@ -200,17 +220,24 @@ function AddChapter() {
                 </option>
               ))}
             </select>
+            <label htmlFor="subjectSelect">Select Subject</label>
           </div>
-          <div className="mb-3">
-            <label className="form-label">Chapter Name</label>
+          <div className="form-floating mb-3">
             <input
+              type="text"
               className="form-control"
+              id="chapterName"
+              placeholder="Chapter Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
+            <label htmlFor="chapterName">Chapter Name</label>
           </div>
-          <button className="btn btn-success w-100" disabled={loading}>
+          <button
+            className="btn btn-success w-100 fw-semibold py-2"
+            disabled={loading}
+          >
             {loading ? "Adding..." : "Add Chapter"}
           </button>
         </form>
@@ -220,7 +247,179 @@ function AddChapter() {
 }
 
 /* =========================
-   ADD QUESTION
+   SUBJECT PDFs WRAPPER
+   ========================= */
+function SubjectPdfsManagerWrapper() {
+  const [subjects, setSubjects] = useState([]);
+  const [subjectId, setSubjectId] = useState("");
+
+  useEffect(() => {
+    api.get("/subjects").then(({ data }) => {
+      setSubjects(data);
+      if (data[0]) setSubjectId(data[0]._id);
+    });
+  }, []);
+
+  return (
+    <div className="card border-0 shadow-lg rounded-4">
+      <div className="card-body p-4">
+        <h5 className="card-title fw-bold text-danger mb-3">
+          <FaFilePdf className="me-2" />
+          Add Subject PDFs
+        </h5>
+        <div className="form-floating mb-4">
+          <select
+            className="form-select"
+            id="pdfSubjectSelect"
+            value={subjectId}
+            onChange={(e) => setSubjectId(e.target.value)}
+          >
+            {subjects.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <label htmlFor="pdfSubjectSelect">Select Subject</label>
+        </div>
+        {subjectId && <SubjectPdfsManager subjectId={subjectId} />}
+      </div>
+    </div>
+  );
+}
+
+/* =========================
+   SUBJECT PDFs MANAGER
+   ========================= */
+function SubjectPdfsManager({ subjectId }) {
+  const [pdfs, setPdfs] = useState([]);
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
+  const [msg, setMsg] = useState("");
+
+  async function loadPdfs() {
+    try {
+      const { data } = await api.get(`/admin/subjects/${subjectId}/pdfs`);
+      setPdfs(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  useEffect(() => {
+    if (subjectId) loadPdfs();
+  }, [subjectId]);
+
+  async function addPdf(e) {
+    e.preventDefault();
+    try {
+      await api.post(`/admin/subjects/${subjectId}/pdfs`, { title, url });
+      setMsg("✅ PDF added successfully!");
+      setTitle("");
+      setUrl("");
+      await loadPdfs();
+    } catch {
+      setMsg("❌ Failed to add PDF");
+    }
+  }
+
+  return (
+    <>
+      <form onSubmit={addPdf} className="row g-3 mb-3">
+        <div className="col-md-5">
+          <div className="form-floating">
+            <input
+              type="text"
+              className="form-control"
+              id="pdfTitle"
+              placeholder="PDF Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+            <label htmlFor="pdfTitle">PDF Title</label>
+          </div>
+        </div>
+        <div className="col-md-5">
+          <div className="form-floating">
+            <input
+              type="url"
+              className="form-control"
+              id="pdfUrl"
+              placeholder="PDF Link"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              required
+            />
+            <label htmlFor="pdfUrl">PDF Link</label>
+          </div>
+        </div>
+        <div className="col-md-2 d-grid">
+          <button className="btn btn-danger fw-semibold" type="submit">
+            Add PDF
+          </button>
+        </div>
+      </form>
+
+      {msg && (
+        <div
+          className={`alert ${
+            msg.startsWith("✅") ? "alert-success" : "alert-danger"
+          } py-2`}
+        >
+          {msg}
+        </div>
+      )}
+
+      <table className="table table-hover align-middle text-center border">
+        <thead className="table-danger">
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>View</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pdfs.map((p, i) => (
+            <tr key={p._id}>
+              <td>{i + 1}</td>
+              <td>{p.title}</td>
+              <td>
+                <a
+                  href={p.url}
+                  className="btn btn-sm btn-outline-danger"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View PDF
+                </a>
+              </td>
+              <td>
+                <button
+                  className="btn btn-sm btn-outline-dark"
+                  onClick={() => api.delete(`/admin/subjects/${subjectId}/pdfs/${p._id}`).then(loadPdfs)}
+                >
+                  <FaTrash /> Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+          {!pdfs.length && (
+            <tr>
+              <td colSpan="4" className="text-muted">
+                No PDFs added yet
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+/* =========================
+   ADD QUESTION (Enhanced)
    ========================= */
 function AddQuestion() {
   const [subjects, setSubjects] = useState([]);
@@ -237,51 +436,39 @@ function AddQuestion() {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Load subjects
   useEffect(() => {
     (async () => {
-      try {
-        const { data } = await api.get("/subjects");
-        setSubjects(data);
-        if (data[0]) setSubjectId(data[0]._id);
-      } catch (err) {
-        console.error("Error loading subjects:", err);
-      }
+      const { data } = await api.get("/subjects");
+      setSubjects(data);
+      if (data[0]) setSubjectId(data[0]._id);
     })();
   }, []);
 
-  // Load chapters by subject
   useEffect(() => {
     if (!subjectId) return;
     (async () => {
-      try {
-        const { data } = await api.get(`/subjects/${subjectId}/chapters`);
-        setChapters(data);
-        if (data[0]) setChapterId(data[0]._id);
-      } catch (err) {
-        console.error("Error loading chapters:", err);
-      }
+      const { data } = await api.get(`/subjects/${subjectId}/chapters`);
+      setChapters(data);
+      if (data[0]) setChapterId(data[0]._id);
     })();
   }, [subjectId]);
 
-  const updateOption = (i, val) => {
+  const updateOption = (i, val) =>
     setOptions((prev) => prev.map((o, idx) => (idx === i ? val : o)));
-  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-    setImage(file);
-    setPreview(URL.createObjectURL(file));
+    if (file) {
+      setImage(file);
+      setPreview(URL.createObjectURL(file));
+    }
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    setMsg("");
     setLoading(true);
-
+    setMsg("");
     try {
-      // ✅ Use FormData for file upload
       const formData = new FormData();
       formData.append("chapterId", chapterId);
       formData.append("type", type);
@@ -303,19 +490,25 @@ function AddQuestion() {
       setImage(null);
       setPreview(null);
       window.dispatchEvent(new CustomEvent("admin:refreshData"));
-    } catch (e) {
-      console.error("Add question error:", e);
-      setMsg(`❌ ${e?.response?.data?.message || "Failed to add question"}`);
+    } catch (err) {
+      setMsg("❌ Failed to add question");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="card shadow-sm border-0">
-      <div className="card-body">
-        <h5 className="card-title text-warning d-flex align-items-center gap-2">
-          <FaQuestionCircle /> Add Question
+    <div
+      className="card border-0 shadow-lg rounded-4"
+      style={{
+        background:
+          "linear-gradient(145deg, #fff8e1 0%, #fff3cd 100%)",
+      }}
+    >
+      <div className="card-body p-4">
+        <h5 className="card-title fw-bold text-warning mb-3">
+          <FaQuestionCircle className="me-2" />
+          Add Question
         </h5>
 
         {msg && (
@@ -330,129 +523,147 @@ function AddQuestion() {
 
         <form onSubmit={onSubmit}>
           <div className="row g-3">
-            {/* Subject */}
             <div className="col-md-4">
-              <label className="form-label">Subject</label>
-              <select
-                className="form-select"
-                value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
-              >
-                {subjects.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <div className="form-floating">
+                <select
+                  className="form-select"
+                  id="subjectSelect"
+                  value={subjectId}
+                  onChange={(e) => setSubjectId(e.target.value)}
+                >
+                  {subjects.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <label htmlFor="subjectSelect">Select Subject</label>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="form-floating">
+                <select
+                  className="form-select"
+                  id="chapterSelect"
+                  value={chapterId}
+                  onChange={(e) => setChapterId(e.target.value)}
+                >
+                  {chapters.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <label htmlFor="chapterSelect">Select Chapter</label>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="form-floating">
+                <select
+                  className="form-select"
+                  id="typeSelect"
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                >
+                  <option value="Expected">Expected</option>
+                  <option value="PYQ">PYQ</option>
+                </select>
+                <label htmlFor="typeSelect">Question Type</label>
+              </div>
             </div>
 
-            {/* Chapter */}
-            <div className="col-md-4">
-              <label className="form-label">Chapter</label>
-              <select
-                className="form-select"
-                value={chapterId}
-                onChange={(e) => setChapterId(e.target.value)}
-              >
-                {chapters.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Type */}
-            <div className="col-md-4">
-              <label className="form-label">Type</label>
-              <select
-                className="form-select"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="Expected">Expected</option>
-                <option value="PYQ">PYQ</option>
-              </select>
-            </div>
-
-            {/* Question */}
             <div className="col-12">
-              <label className="form-label">Question</label>
-              <textarea
-                className="form-control"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                required
-              />
+              <div className="form-floating">
+                <textarea
+                  className="form-control"
+                  id="question"
+                  placeholder="Enter Question"
+                  style={{ height: "90px" }}
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  required
+                ></textarea>
+                <label htmlFor="question">Question</label>
+              </div>
             </div>
 
-            {/* Options */}
-            <div className="col-12">
-              <label className="form-label">Options</label>
-              {options.map((opt, i) => (
+            {options.map((opt, i) => (
+              <div className="col-md-6" key={i}>
+                <div className="form-floating">
+                  <input
+                    type="text"
+                    className="form-control"
+                    id={`option${i}`}
+                    placeholder={`Option ${i + 1}`}
+                    value={opt}
+                    onChange={(e) => updateOption(i, e.target.value)}
+                    required
+                  />
+                  <label htmlFor={`option${i}`}>Option {i + 1}</label>
+                </div>
+              </div>
+            ))}
+
+            <div className="col-md-6">
+              <div className="form-floating">
                 <input
-                  key={i}
-                  className="form-control mb-2"
-                  placeholder={`Option ${i + 1}`}
-                  value={opt}
-                  onChange={(e) => updateOption(i, e.target.value)}
+                  type="text"
+                  className="form-control"
+                  id="answer"
+                  placeholder="Answer"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
                   required
                 />
-              ))}
+                <label htmlFor="answer">Correct Answer</label>
+              </div>
             </div>
 
-            {/* Answer */}
             <div className="col-md-6">
-              <label className="form-label">Correct Answer</label>
-              <input
-                className="form-control"
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                required
-              />
+              <div className="form-floating">
+                <textarea
+                  className="form-control"
+                  id="explanation"
+                  placeholder="Explanation"
+                  style={{ height: "80px" }}
+                  value={explanation}
+                  onChange={(e) => setExplanation(e.target.value)}
+                ></textarea>
+                <label htmlFor="explanation">Explanation (optional)</label>
+              </div>
             </div>
 
-            {/* Explanation */}
-            <div className="col-md-6">
-              <label className="form-label">Explanation (optional)</label>
-              <textarea
-                className="form-control"
-                value={explanation}
-                onChange={(e) => setExplanation(e.target.value)}
-              />
-            </div>
-
-            {/* ✅ Image Upload */}
-            <div className="col-12 mt-3">
-              <label className="form-label">Question Image (optional)</label>
-
+            <div className="col-12">
+              <label className="form-label fw-semibold text-secondary">
+                Upload Question Image (optional)
+              </label>
               {preview && (
                 <div className="mb-2 text-center">
                   <img
                     src={preview}
                     alt="Preview"
+                    className="img-thumbnail shadow-sm"
                     style={{
                       maxWidth: "200px",
                       maxHeight: "150px",
-                      borderRadius: "6px",
-                      objectFit: "cover",
+                      borderRadius: "10px",
                     }}
                   />
-                  <div className="text-success small mt-1">Image Selected</div>
                 </div>
               )}
-
               <input
                 type="file"
-                accept="image/*"
                 className="form-control"
+                accept="image/*"
                 onChange={handleImageChange}
               />
             </div>
 
-            {/* Submit */}
             <div className="col-12">
-              <button className="btn btn-warning w-100" disabled={loading}>
+              <button
+                className="btn btn-warning text-dark fw-semibold w-100 py-2"
+                disabled={loading}
+              >
                 {loading ? "Adding..." : "Add Question"}
               </button>
             </div>
@@ -463,9 +674,8 @@ function AddQuestion() {
   );
 }
 
-
 /* =========================
-   MANAGE TABLES (CRUD + CASCADE)
+   MANAGE DATA (Enhanced)
    ========================= */
 function ManageData() {
   const [subjects, setSubjects] = useState([]);
@@ -473,564 +683,167 @@ function ManageData() {
   const [chapters, setChapters] = useState([]);
   const [chapterId, setChapterId] = useState("");
   const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  // simple edit modal state
-  const [editModal, setEditModal] = useState({ open: false, entity: null, type: "" });
 
   async function loadSubjects() {
     const { data } = await api.get("/subjects");
     setSubjects(data);
-    if (!subjectId && data[0]) setSubjectId(data[0]._id);
+    if (data[0]) setSubjectId(data[0]._id);
   }
 
   async function loadChapters(sid = subjectId) {
     if (!sid) return setChapters([]);
     const { data } = await api.get(`/subjects/${sid}/chapters`);
     setChapters(data);
-    if (!chapterId && data[0]) setChapterId(data[0]._id);
+    if (data[0]) setChapterId(data[0]._id);
   }
 
   async function loadQuestions(cid = chapterId) {
     if (!cid) return setQuestions([]);
-    const { data } = await api.get(`/chapters/${cid}/questions`, { params: { type: "Expected" } });
-    // merge both types for admin list:
-    let list = data?.questions || [];
-    try {
-      const pyq = await api.get(`/chapters/${cid}/questions`, { params: { type: "PYQ" } });
-      list = [...list, ...(pyq.data?.questions || [])];
-    } catch {}
-    setQuestions(list);
+    const { data } = await api.get(`/chapters/${cid}/questions`, {
+      params: { type: "Expected" },
+    });
+    const pyq = await api.get(`/chapters/${cid}/questions`, {
+      params: { type: "PYQ" },
+    });
+    setQuestions([...data.questions, ...pyq.data.questions]);
   }
 
   useEffect(() => {
     loadSubjects();
-    const refresh = () => {
+    window.addEventListener("admin:refreshData", () => {
       loadSubjects();
-      loadChapters();
-      loadQuestions();
-    };
-    window.addEventListener("admin:refreshData", refresh);
-    return () => window.removeEventListener("admin:refreshData", refresh);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (subjectId) loadChapters(subjectId);
+      if (chapterId) loadQuestions(chapterId);
+    });
   }, []);
 
   useEffect(() => {
     if (subjectId) loadChapters(subjectId);
-    else setChapters([]);
-    setChapterId("");
-    setQuestions([]);
   }, [subjectId]);
 
   useEffect(() => {
     if (chapterId) loadQuestions(chapterId);
-    else setQuestions([]);
   }, [chapterId]);
 
-  /* ---------- UPDATE ---------- */
-  async function handleUpdate(type, entityOrFormData, isFormData = false) {
-  try {
-    if (type === "subject") {
-      await api.put(`/admin/subjects/${entityOrFormData._id}`, {
-        name: entityOrFormData.name,
-        price: entityOrFormData.price,
-        overview: entityOrFormData.overview || "",
-      });
-      await loadSubjects();
-    } else if (type === "chapter") {
-      await api.put(`/admin/chapters/${entityOrFormData._id}`, {
-        name: entityOrFormData.name,
-      });
-      await loadChapters();
-    } else if (type === "question") {
-      const id =
-        entityOrFormData instanceof FormData
-          ? entityOrFormData.get("_id")
-          : entityOrFormData._id;
-
-      if (isFormData) {
-        await api.put(`/admin/questions/${id}`, entityOrFormData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      } else {
-        await api.put(`/admin/questions/${id}`, entityOrFormData);
-      }
-      await loadQuestions();
-    }
-  } catch (err) {
-    console.error("Update error:", err);
-    alert(`❌ Failed to update ${type}`);
-  } finally {
-    setEditModal({ open: false, entity: null, type: "" });
-  }
-}
-
-
-  /* ---------- DELETE (CASCADE) ---------- */
-  async function deleteQuestion(qid) {
-    await api.delete(`/admin/questions/${qid}`);
-  }
-
-  async function deleteChapterCascade(cid) {
-    setLoading(true);
-    try {
-      // try cascade endpoint first
-      try {
-        await api.delete(`/admin/chapters/${cid}`, { params: { cascade: 1 } });
-      } catch {
-        // manual cascade
-        const qResExp = await api.get(`/chapters/${cid}/questions`, { params: { type: "Expected" } });
-        const qResPyq = await api.get(`/chapters/${cid}/questions`, { params: { type: "PYQ" } });
-        const allQs = [...(qResExp.data?.questions || []), ...(qResPyq.data?.questions || [])];
-        for (const q of allQs) {
-          await deleteQuestion(q._id);
-        }
-        await api.delete(`/admin/chapters/${cid}`);
-      }
-      await loadChapters();
-      await loadQuestions();
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function deleteSubjectCascade(sid) {
-    setLoading(true);
-    try {
-      // try cascade endpoint first
-      try {
-        await api.delete(`/admin/subjects/${sid}`, { params: { cascade: 1 } });
-      } catch {
-        // manual cascade: chapters -> questions -> subject
-        const chapRes = await api.get(`/subjects/${sid}/chapters`);
-        const chaps = chapRes.data || [];
-        for (const ch of chaps) {
-          await deleteChapterCascade(ch._id);
-        }
-        await api.delete(`/admin/subjects/${sid}`);
-      }
-      await loadSubjects();
-      // reset filters if deleted selected subject
-      if (sid === subjectId) {
-        setSubjectId("");
-        setChapters([]);
-        setChapterId("");
-        setQuestions([]);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
-    <div className="card shadow-sm border-0">
-      <div className="card-body">
-        <h5 className="card-title d-flex align-items-center gap-2">
-          <FaCubes /> Manage Data
+    <div
+      className="card border-0 shadow-lg rounded-4"
+      style={{
+        background: "linear-gradient(145deg, #f3e8ff 0%, #ede7f6 100%)",
+      }}
+    >
+      <div className="card-body p-4">
+        <h5 className="card-title fw-bold text-purple mb-4" style={{ color: "#6f42c1" }}>
+          <FaCubes className="me-2" />
+          Manage Data
         </h5>
 
-        {/* Filters */}
-        <div className="row g-3 align-items-end mb-3">
+        <div className="row g-3 mb-4">
           <div className="col-md-4">
-            <label className="form-label">Subject</label>
-            <select
-              className="form-select"
-              value={subjectId || ""}
-              onChange={(e) => setSubjectId(e.target.value)}
-            >
-              <option value="">-- Select Subject --</option>
-              {subjects.map((s) => (
-                <option key={s._id} value={s._id}>{s.name}</option>
-              ))}
-            </select>
+            <div className="form-floating">
+              <select
+                className="form-select"
+                id="manageSubject"
+                value={subjectId}
+                onChange={(e) => setSubjectId(e.target.value)}
+              >
+                <option value="">Select Subject</option>
+                {subjects.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="manageSubject">Subject</label>
+            </div>
           </div>
           <div className="col-md-4">
-            <label className="form-label">Chapter</label>
-            <select
-              className="form-select"
-              value={chapterId || ""}
-              onChange={(e) => setChapterId(e.target.value)}
-              disabled={!chapters.length}
-            >
-              <option value="">-- Select Chapter --</option>
-              {chapters.map((c) => (
-                <option key={c._id} value={c._id}>{c.name}</option>
-              ))}
-            </select>
+            <div className="form-floating">
+              <select
+                className="form-select"
+                id="manageChapter"
+                value={chapterId}
+                onChange={(e) => setChapterId(e.target.value)}
+              >
+                <option value="">Select Chapter</option>
+                {chapters.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="manageChapter">Chapter</label>
+            </div>
           </div>
-          <div className="col-md-4 d-flex gap-2">
-            <button className="btn btn-outline-secondary w-100" onClick={() => {
-              loadSubjects(); if (subjectId) loadChapters(subjectId); if (chapterId) loadQuestions(chapterId);
-            }}>
-              Refresh
+          <div className="col-md-4 d-grid">
+            <button
+              className="btn btn-outline-dark fw-semibold"
+              onClick={() => {
+                if (subjectId) loadChapters(subjectId);
+                if (chapterId) loadQuestions(chapterId);
+              }}
+            >
+              Refresh Data
             </button>
           </div>
         </div>
 
-        {/* Subjects Table */}
-        <h6 className="mt-3">Subjects</h6>
-        <div className="table-responsive mb-4">
-          <table className="table table-sm align-middle">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Price (₹)</th>
-                <th style={{ width: 160 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {subjects.map((s, i) => (
-                <tr key={s._id}>
-                  <td>{i + 1}</td>
-                  <td>{s.name}</td>
-                  <td>{s.price}</td>
-                  <td>
-                    <div className="btn-group btn-group-sm">
-                      <button className="btn btn-outline-primary"
-                        onClick={() => setEditModal({ open: true, type: "subject", entity: { ...s } })}>
-                        <FaEdit /> Edit
-                      </button>
-                      <button className="btn btn-outline-danger"
-                        onClick={() => confirmAction(`Delete subject "${s.name}" and all its chapters & questions?`,
-                          () => deleteSubjectCascade(s._id))}>
-                        <FaTrash /> Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!subjects.length && (
-                <tr><td colSpan="4" className="text-center text-muted">No subjects</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Chapters Table */}
-        <h6>Chapters {subjectId ? <small className="text-muted">(in selected subject)</small> : null}</h6>
-        <div className="table-responsive mb-4">
-          <table className="table table-sm align-middle">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Chapter Name</th>
-                <th style={{ width: 160 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {chapters.map((c, i) => (
-                <tr key={c._id}>
-                  <td>{i + 1}</td>
-                  <td>{c.name}</td>
-                  <td>
-                    <div className="btn-group btn-group-sm">
-                      <button className="btn btn-outline-primary"
-                        onClick={() => setEditModal({ open: true, type: "chapter", entity: { ...c } })}>
-                        <FaEdit /> Edit
-                      </button>
-                      <button className="btn btn-outline-danger"
-                        onClick={() => confirmAction(`Delete chapter "${c.name}" and all its questions?`,
-                          () => deleteChapterCascade(c._id))}>
-                        <FaTrash /> Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!chapters.length && (
-                <tr><td colSpan="3" className="text-center text-muted">No chapters</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Questions Table */}
-        <h6>Questions {chapterId ? <small className="text-muted">(in selected chapter)</small> : null}</h6>
-        <div className="table-responsive">
-          <table className="table table-sm align-middle">
-            <thead>
+        {/* Tables Section */}
+        <div className="table-responsive rounded-3 shadow-sm bg-white p-3">
+          <h6 className="fw-bold text-secondary mb-3">Questions List</h6>
+          <table className="table table-hover align-middle text-center">
+            <thead className="table-light">
               <tr>
                 <th>#</th>
                 <th>Type</th>
                 <th>Question</th>
                 <th>Answer</th>
-                <th style={{ width: 160 }}>Actions</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {questions.map((q, i) => (
                 <tr key={q._id}>
                   <td>{i + 1}</td>
-                  <td><span className={`badge ${q.type === "PYQ" ? "text-bg-primary" : "text-bg-secondary"}`}>{q.type}</span></td>
-                  <td className="text-truncate" style={{ maxWidth: 420 }}>{q.question}</td>
-                  <td className="text-truncate" style={{ maxWidth: 200 }}>{q.answer}</td>
                   <td>
-                    <div className="btn-group btn-group-sm">
-                      <button className="btn btn-outline-primary"
-                        onClick={() => setEditModal({ open: true, type: "question", entity: { ...q } })}>
-                        <FaEdit /> Edit
-                      </button>
-                      <button className="btn btn-outline-danger"
-                        onClick={() => confirmAction("Delete this question?", async () => {
-                          await api.delete(`/admin/questions/${q._id}`);
-                          await loadQuestions();
-                        })}>
-                        <FaTrash /> Delete
-                      </button>
-                    </div>
+                    <span
+                      className={`badge ${
+                        q.type === "PYQ" ? "text-bg-primary" : "text-bg-warning"
+                      }`}
+                    >
+                      {q.type}
+                    </span>
+                  </td>
+                  <td className="text-truncate" style={{ maxWidth: 300 }}>
+                    {q.question}
+                  </td>
+                  <td>{q.answer}</td>
+                  <td>
+                    <button
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={() =>
+                        confirm("Delete this question?") &&
+                        api
+                          .delete(`/admin/questions/${q._id}`)
+                          .then(() => loadQuestions())
+                      }
+                    >
+                      <FaTrash />
+                    </button>
                   </td>
                 </tr>
               ))}
               {!questions.length && (
-                <tr><td colSpan="5" className="text-center text-muted">No questions</td></tr>
+                <tr>
+                  <td colSpan="5" className="text-muted">
+                    No questions available
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-
-        {loading && <p className="text-muted mt-3">Processing...</p>}
-
-        {/* Edit Modal */}
-        {editModal.open && (
-          <EditModal
-            type={editModal.type}
-            entity={editModal.entity}
-            onClose={() => setEditModal({ open: false, entity: null, type: "" })}
-            onSave={(ent) => handleUpdate(editModal.type, ent)}
-          />
-        )}
       </div>
     </div>
   );
 }
-
-/* ============ helpers ============ */
-function confirmAction(msg, fn) {
-  if (window.confirm(msg)) fn();
-}
-
-/* =========================
-   EDIT MODAL (SUBJECT/CHAPTER/QUESTION)
-   ========================= */
-function EditModal({ type, entity, onClose, onSave }) {
-  const [form, setForm] = useState({ ...entity });
-  const [newImage, setNewImage] = useState(null);
-  const [preview, setPreview] = useState(null);
-
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const title =
-    type === "subject"
-      ? "Edit Subject"
-      : type === "chapter"
-      ? "Edit Chapter"
-      : "Edit Question";
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setNewImage(file);
-    setPreview(URL.createObjectURL(file));
-  };
-
-  const onSubmit = (e) => {
-    e.preventDefault();
-
-    // ✅ For questions, send FormData if image is included
-    if (type === "question") {
-      const formData = new FormData();
-      formData.append("_id", form._id);
-      Object.entries(form).forEach(([key, val]) => {
-        if (key === "options") formData.append("options", JSON.stringify(val));
-        else if (val !== undefined && val !== null) formData.append(key, val);
-      });
-      if (newImage) formData.append("image", newImage);
-      onSave(formData, true); // mark as FormData
-    } else {
-      onSave(form);
-    }
-  };
-
-  return (
-    <div className="modal d-block" tabIndex="-1" style={{ background: "rgba(0,0,0,.35)" }}>
-      <div className="modal-dialog modal-lg modal-dialog-centered">
-        <div className="modal-content">
-          <form onSubmit={onSubmit}>
-            <div className="modal-header">
-              <h5 className="modal-title">{title}</h5>
-              <button type="button" className="btn-close" onClick={onClose}></button>
-            </div>
-
-            <div className="modal-body">
-              {/* SUBJECT */}
-              {type === "subject" && (
-                <>
-                  <div className="row g-3">
-                    <div className="col-md-8">
-                      <label className="form-label">Name</label>
-                      <input
-                        className="form-control"
-                        value={form.name || ""}
-                        onChange={(e) => set("name", e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Price (₹)</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        value={form.price ?? 0}
-                        onChange={(e) => set("price", Number(e.target.value))}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <label className="form-label">Overview / Syllabus</label>
-                    <textarea
-                      className="form-control"
-                      rows={3}
-                      value={form.overview || ""}
-                      onChange={(e) => set("overview", e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* CHAPTER */}
-              {type === "chapter" && (
-                <div className="mb-3">
-                  <label className="form-label">Chapter Name</label>
-                  <input
-                    className="form-control"
-                    value={form.name || ""}
-                    onChange={(e) => set("name", e.target.value)}
-                    required
-                  />
-                </div>
-              )}
-
-              {/* QUESTION */}
-              {type === "question" && (
-                <div className="row g-3">
-                  <div className="col-md-4">
-                    <label className="form-label">Type</label>
-                    <select
-                      className="form-select"
-                      value={form.type || "Expected"}
-                      onChange={(e) => set("type", e.target.value)}
-                    >
-                      <option value="Expected">Expected</option>
-                      <option value="PYQ">PYQ</option>
-                    </select>
-                  </div>
-
-                  <div className="col-12">
-                    <label className="form-label">Question</label>
-                    <textarea
-                      className="form-control"
-                      value={form.question || ""}
-                      onChange={(e) => set("question", e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="col-12">
-                    <label className="form-label">Options</label>
-                    {(form.options || ["", "", "", ""]).map((opt, i) => (
-                      <input
-                        key={i}
-                        className="form-control mb-2"
-                        value={opt}
-                        onChange={(e) => {
-                          const copy = [...(form.options || ["", "", "", ""])];
-                          copy[i] = e.target.value;
-                          set("options", copy);
-                        }}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="col-md-6">
-                    <label className="form-label">Answer</label>
-                    <input
-                      className="form-control"
-                      value={form.answer || ""}
-                      onChange={(e) => set("answer", e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="col-md-6">
-                    <label className="form-label">Explanation</label>
-                    <textarea
-                      className="form-control"
-                      value={form.explanation || ""}
-                      onChange={(e) => set("explanation", e.target.value)}
-                    />
-                  </div>
-
-                  {/* ✅ Image Upload */}
-                  <div className="col-12 mt-3">
-                    <label className="form-label">Question Image (optional)</label>
-
-                    {form.imageUrl && !preview && (
-                      <div className="mb-2 text-center">
-                        <img
-                          src={form.imageUrl}
-                          alt="Current"
-                          style={{
-                            maxWidth: "200px",
-                            maxHeight: "150px",
-                            borderRadius: "6px",
-                            objectFit: "cover",
-                          }}
-                        />
-                        <div className="text-muted small mt-1">Current Image</div>
-                      </div>
-                    )}
-
-                    {preview && (
-                      <div className="mb-2 text-center">
-                        <img
-                          src={preview}
-                          alt="Preview"
-                          style={{
-                            maxWidth: "200px",
-                            maxHeight: "150px",
-                            borderRadius: "6px",
-                            objectFit: "cover",
-                          }}
-                        />
-                        <div className="text-success small mt-1">New Image Selected</div>
-                      </div>
-                    )}
-
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="form-control"
-                      onChange={handleImageChange}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer">
-              <button type="button" className="btn btn-outline-secondary" onClick={onClose}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                <FaPlus className="me-2" /> Save Changes
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-}
-

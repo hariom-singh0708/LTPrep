@@ -377,3 +377,73 @@ export const removeCourse = async (req, res) => {
     res.status(500).json({ message: "Failed to remove course" });
   }
 };
+
+
+
+/**
+ * Add a PDF (Drive/Cloudinary link) to a Subject
+ */
+export const addSubjectPdf = async (req, res) => {
+  try {
+    const { id } = req.params; // subjectId
+    const { title, url } = req.body;
+
+    if (!title || !url) {
+      return res.status(400).json({ message: "Title and URL are required" });
+    }
+
+    const subject = await Subject.findById(id);
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found" });
+    }
+
+    subject.pdfs.push({ title, url });
+    await subject.save();
+
+    res.status(201).json({ message: "PDF added successfully", subject });
+  } catch (err) {
+    console.error("Add subject PDF error:", err);
+    res.status(500).json({ message: "Failed to add PDF" });
+  }
+};
+
+/**
+ * Delete a specific PDF from a Subject
+ */
+export const deleteSubjectPdf = async (req, res) => {
+  try {
+    const { id, pdfId } = req.params; // subjectId, pdfId
+
+    const subject = await Subject.findById(id);
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found" });
+    }
+
+    subject.pdfs = subject.pdfs.filter((pdf) => pdf._id.toString() !== pdfId);
+    await subject.save();
+
+    res.json({ message: "PDF deleted successfully", subject });
+  } catch (err) {
+    console.error("Delete subject PDF error:", err);
+    res.status(500).json({ message: "Failed to delete PDF" });
+  }
+};
+
+/**
+ * Get all PDFs of a specific Subject
+ */
+export const getSubjectPdfs = async (req, res) => {
+  try {
+    const { id } = req.params; // subjectId
+
+    const subject = await Subject.findById(id).select("name pdfs");
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found" });
+    }
+
+    res.json(subject.pdfs);
+  } catch (err) {
+    console.error("Get subject PDFs error:", err);
+    res.status(500).json({ message: "Failed to fetch PDFs" });
+  }
+};

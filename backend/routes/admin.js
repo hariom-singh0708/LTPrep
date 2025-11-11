@@ -14,11 +14,16 @@ import {
   deleteUser,
   assignCourse,
   removeCourse,
+  addSubjectPdf,      // 👈 new
+  deleteSubjectPdf,   // 👈 new
+  getSubjectPdfs,     // 👈 new
 } from "../controllers/adminController.js";
 import { auth, adminOnly } from "../middleware/auth.js";
 import upload from "../middleware/upload.js";
 
 const router = express.Router();
+
+router.get("/subjects/:id/pdfs", getSubjectPdfs);          // Get all PDFs
 
 // ✅ Secure all routes
 router.use(auth, adminOnly);
@@ -38,6 +43,10 @@ router.post("/remove-course", removeCourse);
 router.post("/subjects", addSubject);
 router.put("/subjects/:id", updateSubject);
 router.delete("/subjects/:id", deleteSubject);
+
+// SUBJECT PDFs
+router.post("/subjects/:id/pdfs", addSubjectPdf);          // Add a PDF
+router.delete("/subjects/:id/pdfs/:pdfId", deleteSubjectPdf); // Delete a specific PDF
 
 // CHAPTERS
 router.post("/chapters", addChapter);

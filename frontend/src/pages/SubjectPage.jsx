@@ -11,6 +11,7 @@ import {
   FaArrowRight,
   FaBars,
   FaDownload,
+  FaFilePdf,
 } from "react-icons/fa";
 
 export default function SubjectPage() {
@@ -19,6 +20,7 @@ export default function SubjectPage() {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [type, setType] = useState("Expected");
   const [questions, setQuestions] = useState([]);
+  const [pdfs, setPdfs] = useState([]);
   const [lockedInfo, setLockedInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -66,14 +68,25 @@ export default function SubjectPage() {
     })();
   }, [selectedChapter, type]);
 
-  // ✅ Download PDF from backend
+  // ✅ Load PDFs related to this subject
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get(`/admin/subjects/${subjectId}/pdfs`);
+        setPdfs(data);
+      } catch (err) {
+        console.error("Failed to load PDFs:", err);
+      }
+    })();
+  }, [subjectId]);
+
+  // ✅ Download All Questions as PDF
   const handleDownloadPDF = async () => {
     try {
       const response = await api.get("/pdf/questions", {
         params: { chapterId: selectedChapter, type },
         responseType: "blob",
       });
-
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -119,20 +132,12 @@ export default function SubjectPage() {
         </div>
 
         {/* ====== Sidebar (Mobile - Offcanvas) ====== */}
-        <div
-          className="offcanvas offcanvas-start"
-          tabIndex="-1"
-          id="chaptersMenu"
-        >
+        <div className="offcanvas offcanvas-start" tabIndex="-1" id="chaptersMenu">
           <div className="offcanvas-header">
             <h5 className="offcanvas-title fw-bold">
               <FaBookOpen className="me-2 text-success" /> Chapters
             </h5>
-            <button
-              type="button"
-              className="btn-close"
-              data-bs-dismiss="offcanvas"
-            ></button>
+            <button type="button" className="btn-close" data-bs-dismiss="offcanvas"></button>
           </div>
           <div className="offcanvas-body p-0">
             <Sidebar
@@ -210,7 +215,7 @@ export default function SubjectPage() {
                 ))}
               </div>
 
-              {/* ====== Download PDF Button ====== */}
+              {/* ====== Download All Questions as PDF ====== */}
               {questions.length > 0 && (
                 <div className="text-end mt-4">
                   <button
@@ -220,6 +225,48 @@ export default function SubjectPage() {
                     <FaDownload className="me-2" />
                     Download All as PDF
                   </button>
+                </div>
+              )}
+
+              {/* ====== Study PDFs Section ====== */}
+              {pdfs.length > 0 && hasAccess && (
+                <div className="mt-5">
+                  <h5 className="fw-bold text-primary mb-3">
+                    <FaFilePdf className="me-2" />
+                    Study Materials / PDFs
+                  </h5>
+
+                  <div className="list-group">
+                    {pdfs.map((pdf) => (
+                      <div
+                        key={pdf._id}
+                        className="list-group-item d-flex justify-content-between align-items-center"
+                      >
+                        <div>
+                          <h6 className="mb-1">{pdf.title}</h6>
+                          <a
+                            href={pdf.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-decoration-none small text-success"
+                          >
+                            View in New Tab
+                          </a>
+                        </div>
+
+                        <a
+                          href={pdf.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          className="btn btn-outline-primary btn-sm"
+                        >
+                          <FaDownload className="me-2" />
+                          Download
+                        </a>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -233,14 +280,7 @@ export default function SubjectPage() {
 /* =========================
    📚 Sidebar Component
    ========================= */
-function Sidebar({
-  chapters,
-  selectedChapter,
-  setSelectedChapter,
-  hasAccess,
-  navigate,
-  subjectId,
-}) {
+function Sidebar({ chapters, selectedChapter, setSelectedChapter, hasAccess, navigate, subjectId }) {
   return (
     <div className="card shadow-sm border-0 h-100 bg-light">
       <div className="card-body">
@@ -256,8 +296,7 @@ function Sidebar({
                 c._id === selectedChapter ? "active" : ""
               }`}
               style={{
-                backgroundColor:
-                  c._id === selectedChapter ? "#0d6efd" : "#f8f9fa",
+                backgroundColor: c._id === selectedChapter ? "#0d6efd" : "#f8f9fa",
                 color: c._id === selectedChapter ? "#fff" : "#000",
               }}
               onClick={() => setSelectedChapter(c._id)}
@@ -294,7 +333,6 @@ function QuestionCard({ q, sno }) {
   const [selected, setSelected] = useState(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [showExplain, setShowExplain] = useState(false);
-
   const isCorrect = selected != null && q.options[selected] === q.answer;
   const optionLetters = ["A", "B", "C", "D"];
 
@@ -315,7 +353,6 @@ function QuestionCard({ q, sno }) {
                 ? "list-group-item-success"
                 : "list-group-item-danger"
               : "";
-
             return (
               <li
                 key={idx}
@@ -355,19 +392,16 @@ function QuestionCard({ q, sno }) {
           </button>
         </div>
 
-        {/* ✅ Show Answer */}
         {showAnswer && (
           <div className="alert alert-success mt-3">
             <strong>Answer:</strong> {q.answer}
           </div>
         )}
 
-        {/* ✅ Show Explanation + Image Together */}
         {showExplain && (
           <div className="alert alert-info mt-3 text-center">
             <strong>Explanation:</strong>
             <div className="mt-2">{q.explanation || "No explanation"}</div>
-
             {q.imageUrl && (
               <div className="mt-3">
                 <img
