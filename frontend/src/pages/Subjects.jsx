@@ -111,11 +111,10 @@ export default function Subjects() {
 
                     <Link
                       to={`/subject/${s._id}`}
-                      className={`btn ${
-                        unlocked
+                      className={`btn ${unlocked
                           ? "btn-outline-success"
                           : "btn-outline-primary"
-                      } btn-sm`}
+                        } btn-sm`}
                     >
                       <FaBookOpen className="me-2" />
                       {unlocked ? "Open Course" : "Preview"}
@@ -185,16 +184,25 @@ function OverviewModal({ subject, onClose }) {
             )}
 
             {/* Download Overview as PDF */}
-            <div className="text-end mt-4">
-              <a
-                href={`${apiBase}/subjects/${subject._id}/overview-pdf`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-success btn-sm d-inline-flex align-items-center gap-2"
-              >
-                <FaDownload /> Download Overview as PDF
-              </a>
-            </div>
+            <button
+              className="btn btn-success btn-sm"
+              onClick={async () => {
+                const token = localStorage.getItem("token");
+                const res = await fetch(`${apiBase}/subjects/${subject._id}/overview-pdf`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!res.ok) return alert("Failed to download PDF");
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${subject.name}_overview.pdf`;
+                a.click();
+              }}
+            >
+              <FaDownload /> Download Overview as PDF
+            </button>
+
           </div>
           <div className="modal-footer">
             <button className="btn btn-outline-secondary" onClick={onClose}>
