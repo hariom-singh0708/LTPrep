@@ -64,10 +64,25 @@ export default function SubjectPage() {
       const { data } = await api.get(`/admin/chapters/${chapterId}/pdfs`);
       setChapterPdfs(data);
     } catch (err) {
-      console.error("Failed to load chapter PDFs:", err);
+      const status = err.response?.status;
+      const message = err.response?.data?.message || "Failed to load study material.";
+
+      if (status === 403) {
+        setLockedInfo({ locked: true, message });
+      } else if (status === 401) {
+        setLockedInfo({ locked: true, message: "Please log in again." });
+        navigate("/login");
+      } else if (status === 404) {
+        setLockedInfo({ locked: true, message: "Chapter not found." });
+      } else {
+        console.error("Unexpected error fetching PDFs:", err);
+        setLockedInfo({ locked: true, message: "Something went wrong while loading PDFs." });
+      }
+
       setChapterPdfs({});
     }
   }
+
 
   /* =========================
      ❓ Load Questions + PDFs
@@ -85,13 +100,27 @@ export default function SubjectPage() {
         setQuestions(data.questions || []);
         if (data.locked) setLockedInfo(data);
         await loadChapterPdfs(selectedChapter);
-      } catch (e) {
-        const msg = e?.response?.data?.message;
+      } catch (err) {
+        const status = err.response?.status;
+        const message = err.response?.data?.message || "Unable to load questions.";
+
         setQuestions([]);
-        if (msg) setLockedInfo({ locked: true, message: msg });
+
+        if (status === 403) {
+          setLockedInfo({ locked: true, message });
+        } else if (status === 401) {
+          setLockedInfo({ locked: true, message: "Session expired. Please log in again." });
+          navigate("/login");
+        } else if (status === 404) {
+          setLockedInfo({ locked: true, message: "Chapter not found." });
+        } else {
+          setLockedInfo({ locked: true, message: "Something went wrong while loading this chapter." });
+          console.error("Error loading questions:", err);
+        }
       } finally {
         setLoading(false);
       }
+
     })();
   }, [selectedChapter, type, mockView]);
 
@@ -106,9 +135,22 @@ export default function SubjectPage() {
         const filtered = (data.mockTests || []).filter((m) => m.type === mockView);
         setMockTests(filtered);
       } catch (err) {
-        console.error("Error fetching mock tests", err);
-        setMockTests([]);
+        const status = err.response?.status;
+        const message = err.response?.data?.message || "Unable to load mock tests.";
+
+        if (status === 403) {
+          setMockTests([]);
+          setLockedInfo({ locked: true, message });
+        } else if (status === 401) {
+          setLockedInfo({ locked: true, message: "Please log in again." });
+          navigate("/login");
+        } else {
+          console.error("Error fetching mock tests:", err);
+          setMockTests([]);
+          setLockedInfo({ locked: true, message: "Something went wrong while fetching mock tests." });
+        }
       }
+
     })();
   }, [mockView, subjectId]);
 
@@ -211,17 +253,15 @@ export default function SubjectPage() {
                   </h5>
                   <div className="btn-group">
                     <button
-                      className={`btn btn-sm ${
-                        type === "Expected" ? "btn-primary" : "btn-outline-primary"
-                      }`}
+                      className={`btn btn-sm ${type === "Expected" ? "btn-primary" : "btn-outline-primary"
+                        }`}
                       onClick={() => setType("Expected")}
                     >
                       Expected
                     </button>
                     <button
-                      className={`btn btn-sm ${
-                        type === "PYQ" ? "btn-primary" : "btn-outline-primary"
-                      }`}
+                      className={`btn btn-sm ${type === "PYQ" ? "btn-primary" : "btn-outline-primary"
+                        }`}
                       onClick={() => setType("PYQ")}
                     >
                       PYQ
@@ -237,11 +277,15 @@ export default function SubjectPage() {
                 )}
 
                 {!loading && lockedInfo?.message && (
-                  <div className="alert alert-info text-center py-4">
+                  <div
+                    className={`alert ${lockedInfo.locked ? "alert-warning" : "alert-danger"
+                      } text-center py-4`}
+                  >
                     <FaLock className="me-2" />
                     {lockedInfo.message}
                   </div>
                 )}
+
 
                 {!loading && !questions.length && !lockedInfo?.locked && (
                   <div className="text-center py-5">
@@ -304,9 +348,8 @@ function Sidebar({ chapters, selectedChapter, setSelectedChapter, hasAccess, nav
           {chapters.map((c) => (
             <button
               key={c._id}
-              className={`list-group-item list-group-item-action ${
-                c._id === selectedChapter ? "active" : ""
-              }`}
+              className={`list-group-item list-group-item-action ${c._id === selectedChapter ? "active" : ""
+                }`}
               style={{
                 backgroundColor: c._id === selectedChapter ? "#0d6efd" : "#f8f9fa",
                 color: c._id === selectedChapter ? "#fff" : "#000",
@@ -368,9 +411,8 @@ function MockTestViewer({ mockView, mockTests, setMockView, hasAccess, subjectId
     <div className="card border-0 shadow-lg rounded-4">
       {/* ===== Header ===== */}
       <div
-        className={`card-header text-white fw-bold ${
-          mockView === "pre" ? "bg-primary" : "bg-success"
-        }`}
+        className={`card-header text-white fw-bold ${mockView === "pre" ? "bg-primary" : "bg-success"
+          }`}
       >
         <FaFilePdf className="me-2" />
         {mockView === "pre" ? "Pre Mock Tests" : "Mains Mock Tests"}
@@ -420,9 +462,8 @@ function MockTestViewer({ mockView, mockTests, setMockView, hasAccess, subjectId
                         href={m.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`btn btn-sm fw-semibold w-100 ${
-                          mockView === "pre" ? "btn-outline-primary" : "btn-outline-success"
-                        }`}
+                        className={`btn btn-sm fw-semibold w-100 ${mockView === "pre" ? "btn-outline-primary" : "btn-outline-success"
+                          }`}
                       >
                         <FaDownload className="me-2" />
                         View / Download

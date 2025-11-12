@@ -10,7 +10,7 @@ const PDF_URL = "https://drive.google.com/file/d/1rxtRMx1KNepEtOidc1P5brMF2cqCQ1
 const QUESTION_IMAGE_URL =
   "https://images.unsplash.com/photo-1608792992053-f397e328a56d?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8bWF0aHxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&q=60&w=1000";
 
-const MONGO_URI = "mongodb+srv://hariom-singh0708:eJsxXMpLXQVNoSUf@cluster0.aqetme5.mongodb.net/LTPrep?retryWrites=true&w=majority&appName=Cluster0"; // change if needed
+const MONGO_URI = "................"
 
 // ==========================
 // 🧮 Utility Generators
@@ -42,7 +42,7 @@ const randomQuestionText = (type, chapterName) => {
 // Random options generator
 const generateOptions = () => {
   const opts = [
-    "Option A", "Option B", "Option C", "Option D", "Option E", "Option F"
+    "Option A", "Option B", "Option C", "Option D"
   ];
   const count = 4 + Math.floor(Math.random() * 3); // between 4 and 6 options
   return opts.slice(0, count);

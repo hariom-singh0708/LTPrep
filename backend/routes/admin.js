@@ -1,14 +1,11 @@
-import express from "express";
+import express from "express"; 
 import {
-  // SUBJECTS
   addSubject,
   updateSubject,
   deleteSubject,
   addSubjectMockTest,
   deleteSubjectMockTest,
   getSubjectMockTests,
-
-  // CHAPTERS
   addChapter,
   updateChapter,
   deleteChapter,
@@ -16,13 +13,9 @@ import {
   addStudyMaterialPdf,
   addMockTestPdf,
   deleteChapterPdf,
-
-  // QUESTIONS
   addQuestion,
   updateQuestion,
   deleteQuestion,
-
-  // DASHBOARD / USERS / COURSES
   getAdminDashboard,
   getAllUsers,
   deleteUser,
@@ -31,16 +24,19 @@ import {
 } from "../controllers/adminController.js";
 
 import { auth, adminOnly } from "../middleware/auth.js";
+import { requirePurchase } from "../middleware/requirePurchase.js"; // ✅ NEW
 import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
 /* =========================
-   PUBLIC ROUTES
+   PUBLIC ROUTES (updated)
    ========================= */
-// Allow fetching PDFs (no login required)
-router.get("/chapters/:id/pdfs", getChapterPdfs);
-router.get("/subjects/:id/mock-tests", getSubjectMockTests);
+
+// ✅ MAKE THEM SECURE
+router.get("/chapters/:id/pdfs", auth, requirePurchase, getChapterPdfs);
+router.get("/subjects/:id/mock-tests", auth, requirePurchase, getSubjectMockTests);
+
 /* =========================
    PROTECTED ADMIN ROUTES
    ========================= */
