@@ -15,7 +15,7 @@ import {
 } from "react-icons/fa";
 
 /* =========================
-   📘 Subject Page
+   📘 Subject Page (Fully Enhanced)
    ========================= */
 export default function SubjectPage() {
   const { id: subjectId } = useParams();
@@ -28,17 +28,22 @@ export default function SubjectPage() {
   const [chapterPdfs, setChapterPdfs] = useState({});
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfType, setPdfType] = useState(null);
-  const { user } = useAuth();
+  const [mockView, setMockView] = useState(null); // "pre" | "mains" | null
+  const [mockTests, setMockTests] = useState([]);
+  const { user, setUser } = useAuth();
   const navigate = useNavigate();
 
-  const hasAccess = useMemo(
-    () =>
-      user?.role === "admin" ||
-      user?.purchasedSubjects?.map(String).includes(String(subjectId)),
-    [user, subjectId]
-  );
+  /* ✅ Check if user has access to this subject */
+  const hasAccess = useMemo(() => {
+    if (!user) return false;
+    if (user.role === "admin") return true;
+    const purchased = (user.purchasedSubjects || []).map(String);
+    return purchased.includes(String(subjectId));
+  }, [user, subjectId]);
 
-  // ✅ Load chapters
+  /* =========================
+     📚 Load Chapters
+     ========================= */
   useEffect(() => {
     (async () => {
       try {
@@ -51,7 +56,9 @@ export default function SubjectPage() {
     })();
   }, [subjectId]);
 
-  // ✅ Load chapter PDFs
+  /* =========================
+     📄 Load Chapter PDFs
+     ========================= */
   async function loadChapterPdfs(chapterId) {
     try {
       const { data } = await api.get(`/admin/chapters/${chapterId}/pdfs`);
@@ -62,9 +69,12 @@ export default function SubjectPage() {
     }
   }
 
-  // ✅ Load questions + PDFs
+  /* =========================
+     ❓ Load Questions + PDFs
+     ========================= */
   useEffect(() => {
-    if (!selectedChapter) return;
+    if (!selectedChapter || mockView) return; // Skip if in mock test view
+
     (async () => {
       setLoading(true);
       setLockedInfo(null);
@@ -83,8 +93,44 @@ export default function SubjectPage() {
         setLoading(false);
       }
     })();
-  }, [selectedChapter, type]);
+  }, [selectedChapter, type, mockView]);
 
+  /* =========================
+     📘 Load Subject Mock Tests
+     ========================= */
+  useEffect(() => {
+    if (!mockView) return;
+    (async () => {
+      try {
+        const { data } = await api.get(`/admin/subjects/${subjectId}/mock-tests`);
+        const filtered = (data.mockTests || []).filter((m) => m.type === mockView);
+        setMockTests(filtered);
+      } catch (err) {
+        console.error("Error fetching mock tests", err);
+        setMockTests([]);
+      }
+    })();
+  }, [mockView, subjectId]);
+
+  /* =========================
+     🔁 Refresh user after purchase (optional)
+     ========================= */
+  useEffect(() => {
+    const refreshUserAfterPurchase = async () => {
+      try {
+        const { data } = await api.get("/auth/me");
+        setUser(data);
+      } catch (e) {
+        console.error("Failed to refresh user data:", e);
+      }
+    };
+    // Optional: uncomment if you reload after checkout
+    // refreshUserAfterPurchase();
+  }, [setUser]);
+
+  /* =========================
+     🧱 Render
+     ========================= */
   return (
     <div className="container-fluid py-4">
       {/* ====== Mobile Header ====== */}
@@ -113,6 +159,7 @@ export default function SubjectPage() {
             hasAccess={hasAccess}
             navigate={navigate}
             subjectId={subjectId}
+            setMockView={setMockView}
           />
         </div>
 
@@ -130,6 +177,7 @@ export default function SubjectPage() {
               selectedChapter={selectedChapter}
               setSelectedChapter={(id) => {
                 setSelectedChapter(id);
+                setMockView(null);
                 const offcanvas = document.querySelector("#chaptersMenu");
                 const bsOffcanvas = bootstrap.Offcanvas.getInstance(offcanvas);
                 bsOffcanvas?.hide();
@@ -137,96 +185,97 @@ export default function SubjectPage() {
               hasAccess={hasAccess}
               navigate={navigate}
               subjectId={subjectId}
+              setMockView={setMockView}
             />
           </div>
         </div>
 
         {/* ====== Main Content ====== */}
         <div className="col-md-9">
-          <div className="card shadow-sm border-0">
-            <div className="card-body">
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h5 className="fw-bold mb-0 text-success">
-                  <FaLightbulb className="me-2" />
-                  {type} Questions
-                </h5>
-                <div className="btn-group">
-                  <button
-                    className={`btn btn-sm ${type === "Expected" ? "btn-primary" : "btn-outline-primary"
+          {mockView ? (
+            <MockTestViewer
+              mockView={mockView}
+              mockTests={mockTests}
+              setMockView={setMockView}
+              hasAccess={hasAccess}
+              subjectId={subjectId}
+              navigate={navigate}
+            />
+          ) : (
+            <div className="card shadow-sm border-0">
+              <div className="card-body">
+                <div className="d-flex align-items-center justify-content-between mb-3">
+                  <h5 className="fw-bold mb-0 text-success">
+                    <FaLightbulb className="me-2" />
+                    {type} Questions
+                  </h5>
+                  <div className="btn-group">
+                    <button
+                      className={`btn btn-sm ${
+                        type === "Expected" ? "btn-primary" : "btn-outline-primary"
                       }`}
-                    onClick={() => setType("Expected")}
-                  >
-                    Expected
-                  </button>
-                  <button
-                    className={`btn btn-sm ${type === "PYQ" ? "btn-primary" : "btn-outline-primary"
+                      onClick={() => setType("Expected")}
+                    >
+                      Expected
+                    </button>
+                    <button
+                      className={`btn btn-sm ${
+                        type === "PYQ" ? "btn-primary" : "btn-outline-primary"
                       }`}
-                    onClick={() => setType("PYQ")}
-                  >
-                    PYQ
-                  </button>
+                      onClick={() => setType("PYQ")}
+                    >
+                      PYQ
+                    </button>
+                  </div>
                 </div>
+
+                {loading && (
+                  <div className="text-center py-5">
+                    <div className="spinner-border text-success"></div>
+                    <p className="text-muted mt-2">Loading questions...</p>
+                  </div>
+                )}
+
+                {!loading && lockedInfo?.message && (
+                  <div className="alert alert-info text-center py-4">
+                    <FaLock className="me-2" />
+                    {lockedInfo.message}
+                  </div>
+                )}
+
+                {!loading && !questions.length && !lockedInfo?.locked && (
+                  <div className="text-center py-5">
+                    <p className="text-muted mb-1">No questions found for this chapter.</p>
+                  </div>
+                )}
+
+                <div className="vstack gap-3">
+                  {questions.map((q, idx) => (
+                    <QuestionCard key={q._id} q={q} sno={idx} />
+                  ))}
+                </div>
+
+                {!loading && !lockedInfo?.locked && (
+                  <div className="d-flex justify-content-center gap-3 mt-4">
+                    <button
+                      className="btn btn-outline-success fw-semibold"
+                      onClick={() => {
+                        setPdfType("study");
+                        setShowPdfModal(true);
+                      }}
+                    >
+                      <FaFilePdf className="me-2" />
+                      Study Material
+                    </button>
+                  </div>
+                )}
               </div>
-
-              {/* ====== Loading / Locked / Empty ====== */}
-              {loading && (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-success"></div>
-                  <p className="text-muted mt-2">Loading questions...</p>
-                </div>
-              )}
-
-              {!loading && lockedInfo?.message && (
-                <div className="alert alert-info text-center py-4">
-                  <FaLock className="me-2" />
-                  {lockedInfo.message}
-                </div>
-              )}
-
-              {!loading && !questions.length && !lockedInfo?.locked && (
-                <div className="text-center py-5">
-                  <p className="text-muted mb-1">No questions found for this chapter.</p>
-                </div>
-              )}
-
-              {/* ====== Question List ====== */}
-              <div className="vstack gap-3">
-                {questions.map((q, idx) => (
-                  <QuestionCard key={q._id} q={q} sno={idx} />
-                ))}
-              </div>
-
-              {/* ====== Chapter PDF Buttons ====== */}
-              {!loading && !lockedInfo?.locked && (
-                <div className="d-flex justify-content-center gap-3 mt-4">
-                  <button
-                    className="btn btn-outline-success fw-semibold"
-                    onClick={() => {
-                      setPdfType("study");
-                      setShowPdfModal(true);
-                    }}
-                  >
-                    <FaFilePdf className="me-2" />
-                    Study Material
-                  </button>
-                  <button
-                    className="btn btn-outline-primary fw-semibold"
-                    onClick={() => {
-                      setPdfType("mock");
-                      setShowPdfModal(true);
-                    }}
-                  >
-                    <FaFilePdf className="me-2" />
-                    Mock Test
-                  </button>
-                </div>
-              )}
             </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* ====== Modal for PDFs ====== */}
+      {/* ====== Chapter PDFs Modal ====== */}
       {showPdfModal && (
         <ChapterPdfsModal
           show={showPdfModal}
@@ -242,29 +291,53 @@ export default function SubjectPage() {
 /* =========================
    📚 Sidebar Component
    ========================= */
-function Sidebar({ chapters, selectedChapter, setSelectedChapter, hasAccess, navigate, subjectId }) {
+function Sidebar({ chapters, selectedChapter, setSelectedChapter, hasAccess, navigate, subjectId, setMockView }) {
   return (
     <div className="card shadow-sm border-0 h-100 bg-light">
-      <div className="card-body">
+      <div className="card-body d-flex flex-column">
         <h5 className="fw-bold mb-3 text-dark">
           <FaBookOpen className="me-2 text-success" />
           Chapters
         </h5>
+
         <div className="list-group small">
           {chapters.map((c) => (
             <button
               key={c._id}
-              className={`list-group-item list-group-item-action ${c._id === selectedChapter ? "active" : ""
-                }`}
+              className={`list-group-item list-group-item-action ${
+                c._id === selectedChapter ? "active" : ""
+              }`}
               style={{
                 backgroundColor: c._id === selectedChapter ? "#0d6efd" : "#f8f9fa",
                 color: c._id === selectedChapter ? "#fff" : "#000",
               }}
-              onClick={() => setSelectedChapter(c._id)}
+              onClick={() => {
+                setSelectedChapter(c._id);
+                setMockView(null);
+              }}
             >
               {c.name}
             </button>
           ))}
+
+          {/* ====== Mock Tests ====== */}
+          <div className="mt-3 px-2">
+            <h6 className="fw-bold text-dark">Mock Tests</h6>
+            <div className="d-flex flex-column gap-2 mt-2">
+              <button
+                className="btn btn-outline-primary btn-sm fw-semibold"
+                onClick={() => setMockView("pre")}
+              >
+                Pre Mock Tests
+              </button>
+              <button
+                className="btn btn-outline-success btn-sm fw-semibold"
+                onClick={() => setMockView("mains")}
+              >
+                Mains Mock Tests
+              </button>
+            </div>
+          </div>
         </div>
 
         {!hasAccess && (
@@ -288,6 +361,94 @@ function Sidebar({ chapters, selectedChapter, setSelectedChapter, hasAccess, nav
 }
 
 /* =========================
+   📄 Mock Test Viewer (Locked if not purchased)
+   ========================= */
+function MockTestViewer({ mockView, mockTests, setMockView, hasAccess, subjectId, navigate }) {
+  return (
+    <div className="card border-0 shadow-lg rounded-4">
+      {/* ===== Header ===== */}
+      <div
+        className={`card-header text-white fw-bold ${
+          mockView === "pre" ? "bg-primary" : "bg-success"
+        }`}
+      >
+        <FaFilePdf className="me-2" />
+        {mockView === "pre" ? "Pre Mock Tests" : "Mains Mock Tests"}
+      </div>
+
+      <div className="card-body">
+        {/* ===== If locked ===== */}
+        {!hasAccess ? (
+          <div className="alert alert-warning text-center py-5 rounded-3">
+            <FaLock className="me-2" size={20} />
+            These mock tests are locked.
+            <div className="mt-3">
+              <button
+                className="btn btn-warning fw-semibold"
+                onClick={() => navigate(`/checkout/${subjectId}`)}
+              >
+                <FaArrowRight className="me-2" />
+                Unlock Now
+              </button>
+            </div>
+          </div>
+        ) : mockTests.length === 0 ? (
+          /* ===== No mock tests ===== */
+          <div className="text-center text-muted py-4">
+            No {mockView} mock tests available.
+          </div>
+        ) : (
+          /* ===== Grid Card Layout ===== */
+          <div className="row g-4">
+            {mockTests.map((m, idx) => (
+              <div key={m._id} className="col-md-4 col-sm-6">
+                <div className="card h-100 border-0 shadow-sm rounded-4">
+                  <div className="card-body text-center d-flex flex-column justify-content-between">
+                    <div>
+                      <FaFilePdf
+                        size={40}
+                        className={`mb-3 ${mockView === "pre" ? "text-primary" : "text-success"}`}
+                      />
+                      <h6 className="fw-bold text-dark">{m.title}</h6>
+                      <p className="text-muted small mb-0">
+                        {mockView === "pre" ? "Pre Test" : "Mains Test"} #{idx + 1}
+                      </p>
+                    </div>
+
+                    <div className="mt-3">
+                      <a
+                        href={m.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`btn btn-sm fw-semibold w-100 ${
+                          mockView === "pre" ? "btn-outline-primary" : "btn-outline-success"
+                        }`}
+                      >
+                        <FaDownload className="me-2" />
+                        View / Download
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ===== Back Button ===== */}
+        <button
+          className="btn btn-secondary w-100 fw-semibold mt-4"
+          onClick={() => setMockView(null)}
+        >
+          Back to Chapters
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+/* =========================
    ❓ Question Card Component
    ========================= */
 function QuestionCard({ q, sno }) {
@@ -304,7 +465,6 @@ function QuestionCard({ q, sno }) {
           <span className="badge bg-success me-2">{sno + 1}</span>
           {q.question}
         </p>
-
         <ul className="list-group">
           {q.options.map((opt, idx) => {
             const isSelected = selected === idx;
@@ -330,25 +490,17 @@ function QuestionCard({ q, sno }) {
                   ) : (
                     <FaTimesCircle className="text-danger" />
                   ))}
-                {!isSelected && isAnswer && showAnswer && (
-                  <FaCheckCircle className="text-success" />
-                )}
+                {!isSelected && isAnswer && showAnswer && <FaCheckCircle className="text-success" />}
               </li>
             );
           })}
         </ul>
 
         <div className="d-flex gap-3 mt-3 flex-wrap">
-          <button
-            className="btn btn-sm btn-outline-success"
-            onClick={() => setShowAnswer((prev) => !prev)}
-          >
+          <button className="btn btn-sm btn-outline-success" onClick={() => setShowAnswer((p) => !p)}>
             {showAnswer ? "Hide Answer" : "Show Answer"}
           </button>
-          <button
-            className="btn btn-sm btn-outline-primary"
-            onClick={() => setShowExplain((prev) => !prev)}
-          >
+          <button className="btn btn-sm btn-outline-primary" onClick={() => setShowExplain((p) => !p)}>
             {showExplain ? "Hide Explanation" : "Show Explanation"}
           </button>
         </div>
@@ -362,19 +514,10 @@ function QuestionCard({ q, sno }) {
         {showExplain && (
           <div className="alert alert-info mt-3 text-center">
             <strong>Explanation:</strong>
-            <div className="mt-2">{q.explanation || "No explanation"}</div>
+            <div className="mt-2">{q.explanation || "No explanation available"}</div>
             {q.imageUrl && (
               <div className="mt-3">
-                <img
-                  src={q.imageUrl}
-                  alt="Question illustration"
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: "300px",
-                    borderRadius: "8px",
-                    objectFit: "contain",
-                  }}
-                />
+                <img src={q.imageUrl} alt="Question Illustration" className="img-fluid rounded-3" />
               </div>
             )}
           </div>
@@ -384,15 +527,13 @@ function QuestionCard({ q, sno }) {
   );
 }
 
-
-function ChapterPdfsModal({ show, onClose, pdfs, type }) {
+/* =========================
+   📄 Chapter PDFs Modal
+   ========================= */
+function ChapterPdfsModal({ show, onClose, pdfs }) {
   if (!show) return null;
 
-  // ✅ Correct handling for new backend response
-  const list =
-    type === "study"
-      ? pdfs.studyMaterials || []
-      : pdfs.mockTests || [];
+  const list = pdfs.studyMaterials || [];
 
   return (
     <div
@@ -402,13 +543,11 @@ function ChapterPdfsModal({ show, onClose, pdfs, type }) {
     >
       <div className="modal-dialog modal-dialog-centered modal-lg">
         <div className="modal-content rounded-4 border-0 shadow-lg">
-          <div
-            className={`modal-header ${type === "study" ? "bg-success" : "bg-primary"
-              } text-white rounded-top-4`}
-          >
+          {/* ===== Header ===== */}
+          <div className="modal-header bg-success text-white rounded-top-4">
             <h5 className="modal-title">
               <FaFilePdf className="me-2" />
-              {type === "study" ? "Study Material" : "Mock Test"} PDFs
+              Study Material PDFs
             </h5>
             <button
               type="button"
@@ -417,10 +556,11 @@ function ChapterPdfsModal({ show, onClose, pdfs, type }) {
             ></button>
           </div>
 
+          {/* ===== Body ===== */}
           <div className="modal-body">
             {list.length === 0 ? (
               <div className="text-center text-muted py-3">
-                No {type === "study" ? "Study Materials" : "Mock Tests"} available.
+                No Study Materials available.
               </div>
             ) : (
               <table className="table table-bordered align-middle text-center">
@@ -441,10 +581,7 @@ function ChapterPdfsModal({ show, onClose, pdfs, type }) {
                           href={pdf.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`btn btn-sm ${type === "study"
-                            ? "btn-outline-success"
-                            : "btn-outline-primary"
-                            }`}
+                          className="btn btn-sm btn-outline-success"
                         >
                           <FaDownload className="me-1" /> View / Download
                         </a>
@@ -456,6 +593,7 @@ function ChapterPdfsModal({ show, onClose, pdfs, type }) {
             )}
           </div>
 
+          {/* ===== Footer ===== */}
           <div className="modal-footer border-0">
             <button
               type="button"

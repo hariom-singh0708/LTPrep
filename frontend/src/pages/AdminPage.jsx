@@ -41,10 +41,16 @@ export default function AdminPage() {
       </div>
 
       <div className="row g-4 mb-4">
-  <div className="col-12">
-    <ChapterPdfsManagerWrapper />
-  </div>
-</div>
+        <div className="col-12">
+          <AddSubjectMockTest /> {/* ✅ new section for mock tests */}
+        </div>
+      </div>
+
+      <div className="row g-4 mb-4">
+        <div className="col-12">
+          <ChapterPdfsManagerWrapper />
+        </div>
+      </div>
 
 
       <div className="row g-4 mb-4">
@@ -103,9 +109,8 @@ function AddSubject() {
         </h5>
         {msg && (
           <div
-            className={`alert ${
-              msg.startsWith("✅") ? "alert-success" : "alert-danger"
-            } py-2`}
+            className={`alert ${msg.startsWith("✅") ? "alert-success" : "alert-danger"
+              } py-2`}
           >
             {msg}
           </div>
@@ -201,9 +206,8 @@ function AddChapter() {
         </h5>
         {msg && (
           <div
-            className={`alert ${
-              msg.startsWith("✅") ? "alert-success" : "alert-danger"
-            } py-2`}
+            className={`alert ${msg.startsWith("✅") ? "alert-success" : "alert-danger"
+              } py-2`}
           >
             {msg}
           </div>
@@ -247,6 +251,200 @@ function AddChapter() {
     </div>
   );
 }
+
+function AddSubjectMockTest() {
+  const [subjects, setSubjects] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState("pre");
+  const [link, setLink] = useState("");
+  const [mockTests, setMockTests] = useState([]);
+  const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Fetch subjects for dropdown
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get("/subjects"); // You might need to expose a public route to get all subjects
+        setSubjects(data);
+      } catch (err) {
+        console.error("Error fetching subjects", err);
+      }
+    })();
+  }, []);
+
+  // Fetch mock tests for selected subject
+  useEffect(() => {
+    if (!selectedSubject) return;
+    (async () => {
+      try {
+        const { data } = await api.get(`/admin/subjects/${selectedSubject}/mock-tests`);
+        setMockTests(data.mockTests || []);
+      } catch (err) {
+        setMockTests([]);
+      }
+    })();
+  }, [selectedSubject]);
+
+  const handleAddMockTest = async (e) => {
+    e.preventDefault();
+    if (!selectedSubject) return setMsg("⚠️ Please select a subject first.");
+    setLoading(true);
+    setMsg("");
+
+    try {
+      const { data } = await api.post(`/admin/subjects/${selectedSubject}/mock-test`, {
+        title,
+        type,
+        link,
+      });
+      setMsg("✅ Mock test added successfully!");
+      setTitle("");
+      setType("pre");
+      setLink("");
+      setMockTests(data.subject.mockTests);
+    } catch (err) {
+      setMsg(`❌ ${err?.response?.data?.message || "Failed to add mock test"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteMockTest = async (mockTestId) => {
+    if (!window.confirm("Delete this mock test?")) return;
+    try {
+      await api.delete(`/admin/subjects/${selectedSubject}/mock-test/${mockTestId}`);
+      setMockTests((prev) => prev.filter((m) => m._id !== mockTestId));
+    } catch (err) {
+      alert("Failed to delete mock test");
+    }
+  };
+
+  return (
+    <div className="card border-0 shadow-lg h-100 rounded-4">
+      <div className="card-body p-4">
+        <h5 className="card-title fw-bold text-primary mb-3">
+          <FaFilePdf className="me-2" />
+          Add Subject Mock Test (Pre / Mains)
+        </h5>
+
+        {msg && (
+          <div
+            className={`alert ${msg.startsWith("✅") ? "alert-success" : "alert-warning"
+              } py-2`}
+          >
+            {msg}
+          </div>
+        )}
+
+        {/* Select Subject */}
+        <div className="form-floating mb-3">
+          <select
+            className="form-select"
+            id="subjectSelect"
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value)}
+            required
+          >
+            <option value="">Select Subject</option>
+            {subjects.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <label htmlFor="subjectSelect">Choose Subject</label>
+        </div>
+
+        {/* Form for Adding Mock Test */}
+        <form onSubmit={handleAddMockTest}>
+          <div className="form-floating mb-3">
+            <input
+              type="text"
+              className="form-control"
+              id="mockTitle"
+              placeholder="Mock Test Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+            <label htmlFor="mockTitle">Mock Test Title</label>
+          </div>
+
+          <div className="form-floating mb-3">
+            <select
+              className="form-select"
+              id="mockType"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              required
+            >
+              <option value="pre">Pre Mock Test</option>
+              <option value="mains">Mains Mock Test</option>
+            </select>
+            <label htmlFor="mockType">Mock Test Type</label>
+          </div>
+
+          <div className="form-floating mb-3">
+            <input
+              type="url"
+              className="form-control"
+              id="mockLink"
+              placeholder="Google Drive Link"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              required
+            />
+            <label htmlFor="mockLink">Google Drive Link</label>
+          </div>
+
+          <button
+            className="btn btn-primary w-100 fw-semibold py-2"
+            disabled={loading}
+          >
+            {loading ? "Adding..." : <><FaPlus className="me-2" />Add Mock Test</>}
+          </button>
+        </form>
+
+        {/* Display Existing Mock Tests */}
+        {mockTests.length > 0 && (
+          <div className="mt-4">
+            <h6 className="fw-bold text-secondary">Existing Mock Tests:</h6>
+            <ul className="list-group mt-2">
+              {mockTests.map((m) => (
+                <li
+                  key={m._id}
+                  className="list-group-item d-flex justify-content-between align-items-center"
+                >
+                  <div>
+                    <FaFilePdf className="text-danger me-2" />
+                    <strong>{m.title}</strong> <span className="badge bg-info text-dark ms-2">{m.type}</span>
+                    <a
+                      href={m.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ms-3 text-decoration-none text-primary"
+                    >
+                      View
+                    </a>
+                  </div>
+                  <button
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={() => handleDeleteMockTest(m._id)}
+                  >
+                    <FaTrash />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 
 /* =========================
@@ -334,8 +532,6 @@ function ChapterPdfsManager({ chapterId }) {
   const [pdfs, setPdfs] = useState({ studyMaterials: [], mockTests: [] });
   const [studyTitle, setStudyTitle] = useState("");
   const [studyUrl, setStudyUrl] = useState("");
-  const [mockTitle, setMockTitle] = useState("");
-  const [mockUrl, setMockUrl] = useState("");
   const [msg, setMsg] = useState("");
 
   async function loadPdfs() {
@@ -371,23 +567,6 @@ function ChapterPdfsManager({ chapterId }) {
     }
   }
 
-  // ✅ Add Mock Test PDF
-  async function addMockTest(e) {
-    e.preventDefault();
-    try {
-      await api.post(`/admin/chapters/${chapterId}/mock-test`, {
-        title: mockTitle,
-        url: mockUrl,
-      });
-      setMsg("✅ Mock Test added successfully!");
-      setMockTitle("");
-      setMockUrl("");
-      await loadPdfs();
-    } catch {
-      setMsg("❌ Failed to add Mock Test");
-    }
-  }
-
   // ✅ Delete PDF
   async function deletePdf(type, pdfId) {
     if (!confirm("Are you sure you want to delete this PDF?")) return;
@@ -404,9 +583,8 @@ function ChapterPdfsManager({ chapterId }) {
     <div className="bg-light p-3 rounded-3 shadow-sm">
       {msg && (
         <div
-          className={`alert ${
-            msg.startsWith("✅") ? "alert-success" : "alert-danger"
-          } py-2`}
+          className={`alert ${msg.startsWith("✅") ? "alert-success" : "alert-danger"
+            } py-2`}
         >
           {msg}
         </div>
@@ -480,76 +658,6 @@ function ChapterPdfsManager({ chapterId }) {
         </table>
       ) : (
         <p className="text-muted small">No Study Materials added yet</p>
-      )}
-
-      {/* =========================
-          🧠 Mock Tests Section
-      ========================= */}
-      <h6 className="fw-bold text-primary mt-4">Mock Tests</h6>
-      <form onSubmit={addMockTest} className="row g-3 mb-3">
-        <div className="col-md-5">
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Title"
-            value={mockTitle}
-            onChange={(e) => setMockTitle(e.target.value)}
-            required
-          />
-        </div>
-        <div className="col-md-5">
-          <input
-            type="url"
-            className="form-control"
-            placeholder="Google Drive Link"
-            value={mockUrl}
-            onChange={(e) => setMockUrl(e.target.value)}
-            required
-          />
-        </div>
-        <div className="col-md-2 d-grid">
-          <button className="btn btn-primary fw-semibold">
-            <FaPlus className="me-1" /> Add
-          </button>
-        </div>
-      </form>
-
-      {pdfs.mockTests.length > 0 ? (
-        <table className="table table-bordered table-sm align-middle">
-          <thead className="table-light">
-            <tr>
-              <th>#</th>
-              <th>Title</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pdfs.mockTests.map((pdf, i) => (
-              <tr key={pdf._id}>
-                <td>{i + 1}</td>
-                <td>{pdf.title}</td>
-                <td>
-                  <a
-                    href={pdf.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-sm btn-outline-primary me-2"
-                  >
-                    <FaEye /> View
-                  </a>
-                  <button
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={() => deletePdf("mock", pdf._id)}
-                  >
-                    <FaTrash /> Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="text-muted small">No Mock Tests added yet</p>
       )}
     </div>
   );
@@ -652,9 +760,8 @@ function AddQuestion() {
 
         {msg && (
           <div
-            className={`alert ${
-              msg.startsWith("✅") ? "alert-success" : "alert-danger"
-            } py-2`}
+            className={`alert ${msg.startsWith("✅") ? "alert-success" : "alert-danger"
+              } py-2`}
           >
             {msg}
           </div>
@@ -946,9 +1053,8 @@ function ManageData() {
                   <td>{i + 1}</td>
                   <td>
                     <span
-                      className={`badge ${
-                        q.type === "PYQ" ? "text-bg-primary" : "text-bg-warning"
-                      }`}
+                      className={`badge ${q.type === "PYQ" ? "text-bg-primary" : "text-bg-warning"
+                        }`}
                     >
                       {q.type}
                     </span>

@@ -44,6 +44,74 @@ export const updateSubject = async (req, res) => {
 };
 
 /* =========================
+   SUBJECT MOCK TESTS
+   ========================= */
+
+// ➕ Add a new mock test (Pre/Mains)
+export const addSubjectMockTest = async (req, res) => {
+  try {
+    const { id } = req.params; // subject ID
+    const { title, type, link } = req.body;
+
+    if (!title || !type || !link) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+
+    const subject = await Subject.findById(id);
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found." });
+    }
+
+    subject.mockTests.push({ title, type, link });
+    await subject.save();
+
+    res.status(200).json({
+      message: "Mock test added successfully!",
+      subject,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error adding mock test", error });
+  }
+};
+
+// 🗑️ Delete a mock test
+export const deleteSubjectMockTest = async (req, res) => {
+  try {
+    const { id, mockTestId } = req.params;
+
+    const subject = await Subject.findById(id);
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found." });
+    }
+
+    subject.mockTests = subject.mockTests.filter(
+      (mock) => mock._id.toString() !== mockTestId
+    );
+    await subject.save();
+
+    res.status(200).json({ message: "Mock test deleted successfully.", subject });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting mock test", error });
+  }
+};
+
+// 📄 Get all mock tests (optional for frontend)
+export const getSubjectMockTests = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const subject = await Subject.findById(id);
+
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found." });
+    }
+
+    res.status(200).json({ mockTests: subject.mockTests });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching mock tests", error });
+  }
+};
+
+/* =========================
    CHAPTER MANAGEMENT
    ========================= */
 

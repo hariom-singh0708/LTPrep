@@ -4,7 +4,9 @@ import {
   addSubject,
   updateSubject,
   deleteSubject,
-
+  addSubjectMockTest,
+  deleteSubjectMockTest,
+  getSubjectMockTests,
 
   // CHAPTERS
   addChapter,
@@ -38,7 +40,7 @@ const router = express.Router();
    ========================= */
 // Allow fetching PDFs (no login required)
 router.get("/chapters/:id/pdfs", getChapterPdfs);
-
+router.get("/subjects/:id/mock-tests", getSubjectMockTests);
 /* =========================
    PROTECTED ADMIN ROUTES
    ========================= */
@@ -59,7 +61,8 @@ router.post("/remove-course", removeCourse);
 router.post("/subjects", addSubject);
 router.put("/subjects/:id", updateSubject);
 router.delete("/subjects/:id", deleteSubject);
-
+router.post("/subjects/:id/mock-test", addSubjectMockTest);
+router.delete("/subjects/:id/mock-test/:mockTestId", deleteSubjectMockTest);
 
 // CHAPTERS
 router.post("/chapters", addChapter);
