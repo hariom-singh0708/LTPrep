@@ -9,6 +9,11 @@ import AdminPage from "./pages/AdminPage.jsx";
 import { ProtectedRoute, AdminRoute } from "./components/ProtectedRoute.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import AdminDashboard from "./pages/AdminDashboard";
+import Footer from "./components/Footer";
+import About from "./pages/About";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import Refund from "./pages/Refund";
 
 export default function App() {
   return (
@@ -20,7 +25,7 @@ export default function App() {
           <Route
             path="/"
             element={
-                <Home />
+              <Home />
             }
           />
           <Route
@@ -58,19 +63,24 @@ export default function App() {
             }
           />
           <Route
-          path="/admin/dashboard"
-          element={
-            <ProtectedRoute>
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute>
                 <AdminRoute>
                   <AdminDashboard />
                 </AdminRoute>
               </ProtectedRoute>
-          }
-        />
+            }
+          />
           <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/refund" element={<Refund />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
+      <Footer />
     </>
   );
 }
